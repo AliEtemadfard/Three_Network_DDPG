@@ -156,5 +156,11 @@ def validate_config(config: DictConfig) -> None:
         errors.append("batch size cannot exceed replay capacity")
     if not isinstance(experiment.bootstrap_on_truncation, bool):
         errors.append("experiment.bootstrap_on_truncation must be boolean")
+    if not isinstance(experiment.clip_actions, bool):
+        errors.append("experiment.clip_actions must be boolean")
+    if environment.id == "ThreeNetworkTinyContinuous-v0":
+        horizon = environment.get("horizon")
+        if isinstance(horizon, bool) or not isinstance(horizon, int) or horizon <= 0:
+            errors.append("environment.horizon must be a positive integer")
     if errors:
         raise ValueError("; ".join(errors))

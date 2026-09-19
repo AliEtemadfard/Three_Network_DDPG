@@ -6,6 +6,7 @@ replay_capacity: 100000
 evaluation_frequency: 5000
 evaluation_episodes: 5
 bootstrap_on_truncation: true
+clip_actions: true
 output_root: runs
 tracking:
   csv_jsonl: true

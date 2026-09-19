@@ -1,0 +1,6 @@
+id: ThreeNetworkTinyContinuous-v0
+wrappers: []
+horizon: 5
+observation_normalization: false
+reward_scale: 1.0
+action_bounds: environment

@@ -1,8 +1,9 @@
-"""Fast tests for metadata-only repository behavior."""
+"""Fast checks retained from the bootstrap scaffold."""
 
 import random
 
 import pytest
+import torch
 from omegaconf import OmegaConf
 
 import three_network_ddpg
@@ -20,10 +21,26 @@ from three_network_ddpg.core.seeds import seed_environment, seed_everything
 
 def test_imports_and_typed_batches() -> None:
     assert three_network_ddpg.__version__ == "0.1.0"
-    transition = TransitionBatch([1], [2], [3], [4], [False], [True])
-    rollout = RolloutBatch([1], [2], [3], [4], [False], [False])
-    assert transition.truncated == [True]
-    assert rollout.terminated == [False]
+    flags = torch.tensor([[False]], dtype=torch.bool)
+    transition = TransitionBatch(
+        observations=torch.zeros((1, 2)),
+        actions=torch.zeros((1, 1)),
+        rewards=torch.zeros((1, 1)),
+        next_observations=torch.ones((1, 2)),
+        terminated=flags,
+        truncated=flags.clone(),
+        bootstrap_mask=torch.ones((1, 1)),
+    )
+    rollout = RolloutBatch(
+        observations=torch.zeros((1, 2)),
+        actions=torch.zeros((1, 1)),
+        rewards=torch.zeros((1, 1)),
+        next_observations=torch.ones((1, 2)),
+        terminated=flags,
+        truncated=flags.clone(),
+    )
+    assert transition.batch_size == 1
+    assert not rollout.terminated.any()
 
 
 @pytest.mark.parametrize("name", sorted(ALGORITHMS))
@@ -72,7 +89,7 @@ def test_seed_utility_repeats_python_sequence() -> None:
     seed_everything(17)
     assert random.random() == first
     assert report.seed == 17
-    with pytest.raises(ValueError, match="non-negative"):
+    with pytest.raises(ValueError, match="seed must"):
         seed_everything(-1)
 
 
