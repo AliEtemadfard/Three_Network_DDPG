@@ -1,0 +1,7 @@
+# Research problem
+
+The supplied [research specification](source/Three_Network_DDPG_Research_Specification.docx) reconstructs a deterministic actor–critic proposal from whiteboard notes and explanation. Standard DDPG uses online and slowly copied target actor and critic networks. Those copies can stabilize bootstrap targets, but they do not prove convergence for nonlinear actor–critic learning.
+
+The proposed method retains one deterministic actor and trains two critics independently. Critic One supplies the current value in a shared Bellman residual. Critic Two supplies the next bootstrap value and actor objective. Agreement on matched current and next inputs is proposed to keep the critics coherent. The research task is to find update choices that preserve policy improvement while controlling the shared error and critic drift.
+
+The actor ascent direction can increase shared error. Agreement penalties and beta regularization can rotate critic directions away from shared-error descent. Positive coefficients alone do not give a descent proof. Even a successful fixed-minibatch acceptance test says nothing by itself about expected error or episodic return. The credible first target is correct gradient flow, local or minibatch descent diagnostics, and fair empirical comparison. Global convergence, optimal-policy convergence, monotonic return, cost savings, and novelty are unestablished.

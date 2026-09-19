@@ -1,0 +1,4 @@
+# Selectors only; values come from explicit groups.
+algorithm: three_network_ddpg
+environment: pendulum_v1
+experiment: scaffold_smoke

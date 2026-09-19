@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "three-network-ddpg"
+version = "0.1.0"
+description = "Research scaffold for a three-network deterministic actor-critic method"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+authors = [{ name = "Three Network DDPG contributors" }]
+classifiers = ["Programming Language :: Python :: 3", "Development Status :: 2 - Pre-Alpha"]
+dependencies = [
+  "torch>=2.2",
+  "gymnasium>=0.29",
+  "omegaconf>=2.3,<3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9", "ruff>=0.8,<1", "pre-commit>=3.7,<5"]
+plotting = ["matplotlib>=3.8", "pandas>=2.2"]
+tracking = ["tensorboard>=2.16"]
+wandb = ["wandb>=0.17"]
+
+[project.scripts]
+three-network-ddpg = "three_network_ddpg.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+three_network_ddpg = ["conf/**/*.yaml", "conf/*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

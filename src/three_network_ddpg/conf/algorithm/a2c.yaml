@@ -1,0 +1,10 @@
+name: a2c
+implementation_status: planned
+is_on_policy: true
+uses_replay_buffer: false
+supports_continuous_actions: true
+actor_state_source: current
+exploration_noise:
+  mode: policy
+  standard_deviation: null
+  clip: null

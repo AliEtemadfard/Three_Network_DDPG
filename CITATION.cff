@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: "Please cite this repository if you use its research scaffold. Cite the eventual paper separately when available."
+title: "Three Network DDPG Research Repository"
+type: software
+authors:
+  - name: "Three Network DDPG contributors"
+version: 0.1.0
+date-released: 2026-09-19

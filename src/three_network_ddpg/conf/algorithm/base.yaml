@@ -1,0 +1,37 @@
+# Schema placeholders, not tuned scientific defaults.
+implementation_status: planned
+gamma: 0.99
+actor_learning_rate: 0.0003
+critic_one_learning_rate: 0.001
+critic_two_learning_rate: 0.001
+optimizer:
+  name: adam
+  epsilon: 0.00000001
+  weight_decay: 0.0
+hidden_layers: [256, 256]
+activation: relu
+device: cpu
+seed: 0
+exploration_noise:
+  mode: gaussian
+  standard_deviation: 0.1
+  clip: null
+action_rescaling: true
+gradient_clip_norm: null
+agreement_mode: none
+alpha: 0.0
+alpha_prime: 0.0
+beta_regularizer:
+  mode: none
+  coefficient: 0.0
+update_schedule: alternating
+actor_state_source: next
+critic_initialization: independent
+actor_update_delay: 1
+guard:
+  tolerance: 0.0
+  backtracking_factor: 0.5
+  maximum_retries: 5
+  minimum_learning_rate: 0.000001
+  validation_batch: false
+diagnostic_frequency: 100

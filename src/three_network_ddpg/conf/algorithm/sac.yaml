@@ -1,0 +1,14 @@
+name: sac
+implementation_status: planned
+is_on_policy: false
+uses_replay_buffer: true
+supports_continuous_actions: true
+actor_state_source: current
+exploration_noise:
+  mode: policy
+  standard_deviation: null
+  clip: null
+target_networks:
+  actor: false
+  critic: true
+  tau: 0.005

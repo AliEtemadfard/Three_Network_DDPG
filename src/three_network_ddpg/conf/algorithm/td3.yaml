@@ -1,0 +1,11 @@
+name: td3
+implementation_status: planned
+is_on_policy: false
+uses_replay_buffer: true
+supports_continuous_actions: true
+actor_state_source: current
+actor_update_delay: 2
+target_networks:
+  actor: true
+  critic: true
+  tau: 0.005

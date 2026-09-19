@@ -1,0 +1,5 @@
+id: Pendulum-v1
+wrappers: []
+observation_normalization: false
+reward_scale: 1.0
+action_bounds: environment

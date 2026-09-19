@@ -1,0 +1,13 @@
+name: scaffold_smoke
+total_steps: 100000
+warmup_steps: 1000
+batch_size: 256
+replay_capacity: 100000
+evaluation_frequency: 5000
+evaluation_episodes: 5
+bootstrap_on_truncation: true
+output_root: runs
+tracking:
+  csv_jsonl: true
+  tensorboard: false
+  wandb: false
