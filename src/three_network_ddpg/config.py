@@ -12,7 +12,7 @@ from .algorithms.registry import get_algorithm_metadata
 _NAME = re.compile(r"[a-z][a-z0-9_]*\Z")
 _AGREEMENT = {"none", "current", "next", "both"}
 _BETA = {"none", "linear_y", "l2_y", "l2_y_z"}
-_SCHEDULE = {"simultaneous", "alternating", "guarded"}
+_SCHEDULE = {"simultaneous", "sequential", "alternating", "guarded"}
 
 
 def _read_yaml(*parts: str) -> DictConfig:
@@ -83,8 +83,25 @@ def validate_config(config: DictConfig) -> None:
     ):
         if getattr(algorithm, field, None) != getattr(metadata, field):
             errors.append(f"algorithm.{field} must match registry metadata")
-    if algorithm.name == "three_network_ddpg" and "target_networks" in algorithm:
-        errors.append("proposed main variant must not define target networks")
+    if algorithm.name == "three_network_ddpg":
+        if "target_networks" in algorithm:
+            errors.append("proposed main variant must not define target networks")
+        if algorithm.agreement_mode != "none" or algorithm.alpha != 0 or algorithm.alpha_prime != 0:
+            errors.append("minimal three-network core requires agreement mode none and zero alphas")
+        if algorithm.beta_regularizer.mode != "none" or algorithm.beta_regularizer.coefficient != 0:
+            errors.append("minimal three-network core requires beta regularization to be disabled")
+        if algorithm.update_schedule not in {"sequential", "simultaneous"}:
+            errors.append("minimal three-network core supports sequential or simultaneous updates")
+        if algorithm.critic_initialization != "independent":
+            errors.append("minimal three-network core requires independent critic initialization")
+        if algorithm.actor_update_delay != 1:
+            errors.append("minimal three-network core updates the actor every learner step")
+        if algorithm.optimizer.name != "adam":
+            errors.append("minimal three-network core currently supports the Adam optimizer")
+        if not algorithm.action_rescaling:
+            errors.append("minimal three-network core requires action rescaling")
+        if algorithm.exploration_noise.mode not in {"gaussian", "none"}:
+            errors.append("minimal three-network core supports gaussian or disabled exploration")
     if algorithm.name in {"ddpg", "td3"}:
         if "target_networks" not in algorithm:
             errors.append("DDPG and TD3 require explicit target-network settings")
@@ -130,11 +147,18 @@ def validate_config(config: DictConfig) -> None:
             errors.append(f"algorithm.{name} must be nonnegative")
     if not _number(algorithm.beta_regularizer.coefficient, nonnegative=True):
         errors.append("algorithm.beta_regularizer.coefficient must be nonnegative")
-    for name in ("seed", "actor_update_delay", "diagnostic_frequency"):
+    for name in ("seed", "actor_update_delay"):
         value = getattr(algorithm, name)
         minimum = 0 if name == "seed" else 1
         if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
             errors.append(f"algorithm.{name} must be an integer >= {minimum}")
+    diagnostic_frequency = algorithm.diagnostic_frequency
+    if diagnostic_frequency is not None and (
+        isinstance(diagnostic_frequency, bool)
+        or not isinstance(diagnostic_frequency, int)
+        or diagnostic_frequency < 1
+    ):
+        errors.append("algorithm.diagnostic_frequency must be null or a positive integer")
     guard = algorithm.guard
     if not _number(guard.tolerance, nonnegative=True):
         errors.append("algorithm.guard.tolerance must be nonnegative")

@@ -1,4 +1,4 @@
-"""Executable DDPG experiment orchestration and local JSONL tracking."""
+"""Executable off-policy experiment orchestration and local JSONL tracking."""
 
 import json
 from dataclasses import asdict
@@ -7,7 +7,7 @@ from typing import Any
 
 from omegaconf import DictConfig
 
-from .algorithms.ddpg import DDPG
+from .algorithms.registry import create_algorithm
 from .core.interfaces import MetricRecord, OffPolicyAlgorithm
 from .core.metadata import prepare_run_directory
 from .core.replay import ReplayBuffer
@@ -16,21 +16,28 @@ from .evaluation import EvaluationResult, evaluate
 from .training import OffPolicyTrainer, TrainerSettings
 
 
-def run_ddpg_experiment(config: DictConfig, *, repo_root: Path) -> Path:
-    """Train and evaluate DDPG once while retaining complete local artifacts."""
-    if config.algorithm.name != "ddpg":
-        raise ValueError("DDPG experiment requires algorithm.name=ddpg")
+def _run_off_policy_experiment(
+    config: DictConfig,
+    *,
+    repo_root: Path,
+    expected_algorithm: str,
+) -> Path:
+    if config.algorithm.name != expected_algorithm:
+        raise ValueError(f"{expected_algorithm} experiment requires algorithm.name={expected_algorithm}")
     training_environment = make_environment(config.environment)
     evaluation_environment = make_environment(config.environment)
     try:
         if training_environment.observation_space.shape is None:
             raise ValueError("observation space must expose a shape")
-        algorithm = DDPG.from_config(
-            config.algorithm,
+        algorithm = create_algorithm(
+            expected_algorithm,
+            algorithm_config=config.algorithm,
             observation_dim=int(training_environment.observation_space.shape[0]),
             action_low=training_environment.action_space.low,
             action_high=training_environment.action_space.high,
         )
+        if not isinstance(algorithm, OffPolicyAlgorithm):
+            raise TypeError("experiment runner requires an off-policy algorithm")
         replay = ReplayBuffer(
             capacity=int(config.experiment.replay_capacity),
             observation_shape=training_environment.observation_space.shape,
@@ -92,6 +99,7 @@ def run_ddpg_experiment(config: DictConfig, *, repo_root: Path) -> Path:
         summary: dict[str, Any] = {
             "scientific_evidence": False,
             "note": "Single smoke run for execution verification only.",
+            "algorithm": expected_algorithm,
             "environment_steps": training.environment_steps,
             "update_steps": training.gradient_updates,
             "wall_time_seconds": training.wall_time_seconds,
@@ -109,3 +117,13 @@ def run_ddpg_experiment(config: DictConfig, *, repo_root: Path) -> Path:
     finally:
         training_environment.close()
         evaluation_environment.close()
+
+
+def run_ddpg_experiment(config: DictConfig, *, repo_root: Path) -> Path:
+    """Train and evaluate the verified DDPG baseline once."""
+    return _run_off_policy_experiment(config, repo_root=repo_root, expected_algorithm="ddpg")
+
+
+def run_three_network_experiment(config: DictConfig, *, repo_root: Path) -> Path:
+    """Train and evaluate the minimal shared-error three-network method once."""
+    return _run_off_policy_experiment(config, repo_root=repo_root, expected_algorithm="three_network_ddpg")

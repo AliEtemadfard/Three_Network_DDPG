@@ -1,0 +1,15 @@
+# Conservative execution defaults, not paper-scale or evidence-producing settings.
+name: three_network_core
+total_steps: 2000
+warmup_steps: 256
+batch_size: 64
+replay_capacity: 10000
+evaluation_frequency: 1000
+evaluation_episodes: 2
+bootstrap_on_truncation: true
+clip_actions: true
+output_root: runs
+tracking:
+  csv_jsonl: true
+  tensorboard: false
+  wandb: false

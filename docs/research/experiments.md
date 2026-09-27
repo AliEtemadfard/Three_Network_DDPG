@@ -3,7 +3,7 @@
 ## Sequence
 
 1. Verify standard DDPG on a small deterministic continuous task and Pendulum-v1 before implementing the proposal.
-2. Test the minimal shared-error method with no agreement or beta term. Check gradients, terminal masks, action scaling, and absence of target networks.
+2. Maintain the implemented minimal shared-error method with no agreement or beta term. Its focused tests check gradients, terminal masks, action scaling, simultaneous snapshots, and absence of target networks; multi-seed evidence remains pending.
 3. Add current and next agreement penalties separately, then together.
 4. Compare beta modes, update schedules, actor state sources, critic initialization, actor delay, alpha values, and guarded controls.
 5. Run at least ten planned seeds on Pendulum-v1, then one harder continuous-control environment after stability is established.

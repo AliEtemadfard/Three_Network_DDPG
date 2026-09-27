@@ -1,6 +1,6 @@
 # Three Network DDPG
 
-**Status:** The standard four-network DDPG baseline is implemented and verified by focused CPU tests. The proposed three-network method and all other learning algorithms remain unimplemented. The [original research specification](docs/research/source/Three_Network_DDPG_Research_Specification.docx) is preserved verbatim.
+**Status:** The standard four-network DDPG baseline is verified by focused CPU tests. The minimal proposed three-network method is implemented as an experimental shared-error-only core. Agreement penalties, beta regularization, guarded updates, TD3, SAC, A2C, and A3C remain unimplemented. The [original research specification](docs/research/source/Three_Network_DDPG_Research_Specification.docx) is preserved verbatim.
 
 DDPG uses a deterministic actor and a value critic, usually with slowly updated target copies of both networks. Target networks reduce movement in the bootstrap target but do not establish general convergence for nonlinear actorâ€“critic learning. They also add parameter storage. This project asks whether one actor and two independently optimized critics can maintain a useful Bellman relation without target networks in the proposed main variant.
 
@@ -35,10 +35,14 @@ With an explicitly chosen bootstrap mask `m`, the shared residual is `Î´ = r + Î
 
 **Warning:** The original linear beta term can drive negative `Y` values downward and does not bound their magnitude. Linear and quadratic variants are research alternatives. The final objective and convergence statement remain unresolved; see [open questions](docs/research/open_questions.md).
 
+### Executable minimal variant
+
+The implemented proposed variant uses exactly one actor and two independently initialized critics. It minimizes only `0.5 * mean(delta ** 2)` for each critic with the other critic output fixed, and maximizes Critic Two for the actor. It has no target modules. `sequential` recomputes after each Critic Two -> Critic One -> actor step; `simultaneous` stores all gradients from one pre-update snapshot before any optimizer step. Next-state actor input is the default; current-state input is an executable ablation. See [minimal shared-error implementation](docs/research/three_network_core.md) for the complete scope and deviations from the source specification.
+
 ## Roadmap
 
 1. Maintain and empirically validate the implemented standard DDPG baseline on Pendulum and later tasks.
-2. Implement the minimal three-network shared-error method and verify every gradient path.
+2. Maintain and empirically validate the implemented minimal shared-error method and its verified gradient paths.
 3. Ablate no, current, next, and both critic-agreement penalties.
 4. Ablate beta regularizers, simultaneous/alternating/guarded schedules, actor state source, initialization, and actor delay.
 5. Run fair multi-seed studies and failure analysis.
@@ -47,7 +51,7 @@ With an explicitly chosen bootstrap mask `m`, the shared residual is `Î´ = r + Î
 
 ## Set up and commands that work now
 
-Use Python 3.11 and CPU by default. The environment file installs the editable package with development tools. The environment smoke command exercises a seeded random policy. The DDPG command performs a short local learning run and records artifacts; its default budget is for execution checks, not scientific comparison.
+Use Python 3.11 and CPU by default. The environment file installs the editable package with development tools. The environment smoke command exercises a seeded random policy. The DDPG and three-network commands perform short local learning runs and record artifacts; their default budgets are for execution checks, not scientific comparison.
 
 ~~~bash
 conda env create -f environment.yml
@@ -60,6 +64,7 @@ three-network-ddpg config show
 three-network-ddpg env-smoke --environment tiny_continuous --steps 6 --seed 2
 three-network-ddpg env-smoke --environment pendulum_v1 --steps 3 --seed 2
 three-network-ddpg train-ddpg --environment pendulum_v1 --experiment ddpg_baseline
+three-network-ddpg train-three-network --environment pendulum_v1 --experiment three_network_core
 python -m pytest
 ruff check .
 ruff format --check .
@@ -67,7 +72,7 @@ ruff format --check .
 
 For local TensorBoard or plotting support, install `.[tracking]` or `.[plotting]`. Weights & Biases remains optional under `.[wandb]`. No account or network service is required for default local tracking.
 
-**Available:** `DDPG`, `ReplayBuffer`, `OffPolicyTrainer`, `evaluate`, `make_environment`, action transforms, seed helpers, and `prepare_run_directory`. `train-ddpg` writes resolved configuration, metadata, JSONL metrics, a summary, and a checkpoint. TD3, SAC, A2C, A3C, and the proposed method remain `planned` and cannot enter the trainer. Plotting and general checkpoint-management commands are planned.
+**Available:** `DDPG`, experimental `ThreeNetworkDDPG`, `ReplayBuffer`, `OffPolicyTrainer`, `evaluate`, `make_environment`, action transforms, seed helpers, and `prepare_run_directory`. Both training commands write resolved configuration, metadata, JSONL metrics, a summary, and a checkpoint. TD3, SAC, A2C, and A3C remain `planned` and cannot enter the trainer. Plotting and general checkpoint-management commands are planned.
 
 ## Layout and extension points
 
@@ -76,7 +81,7 @@ For local TensorBoard or plotting support, install `.[tracking]` or `.[plotting]
 | `src/three_network_ddpg/core/` | Typed batches, action transforms, replay, interfaces, seeds, metadata |
 | `src/three_network_ddpg/environments.py` | Tiny deterministic fixture and Pendulum-v1 factory |
 | `src/three_network_ddpg/training.py`, `evaluation.py` | Off-policy trainer shell and separate noise-free evaluator |
-| `src/three_network_ddpg/algorithms/` | Metadata registry and explicit placeholders for DDPG, three-network, TD3, SAC, A2C, A3C |
+| `src/three_network_ddpg/algorithms/` | Metadata registry and implemented DDPG and three-network modules plus explicit TD3, SAC, A2C, and A3C placeholders |
 | `src/three_network_ddpg/conf/` | Composable algorithm, environment, experiment YAML |
 | `docs/research/` | Problem, notation, architecture, protocol, reproducibility, baseline policy, questions, decisions |
 | `tests/` | Fast scaffold checks; later gradient and integration tests |
@@ -87,9 +92,9 @@ To add an algorithm, document its capability metadata and experimental role, add
 
 ## Configurations and outputs
 
-`conf/config.yaml` selects one algorithm, environment, and experiment group. `config validate` composes them with OmegaConf and checks the required schema and cross-field constraints. The default proposed-method config is a **design placeholder**, not a selected scientific conclusion. It reserves alpha, alpha-prime, beta mode, schedule, state source, initialization, guarded-update controls, actor delay, and diagnostic frequency. DDPG and TD3 configs reserve their own target-network settings; the proposed main config has none. The experiment group explicitly chooses action clipping and whether truncations retain a bootstrap value. Device is `cpu` unless explicitly changed.
+`conf/config.yaml` selects one algorithm, environment, and experiment group. `config validate` composes them with OmegaConf and checks the required schema and cross-field constraints. The proposed-method config executes only the shared-error core and rejects nonzero alpha values, beta regularization, guarded updates, target networks, identical critic initialization, and delayed actor updates. It supports sequential or simultaneous schedules, current or next actor state input, and optional actor/residual gradient diagnostics. DDPG and TD3 configs reserve their own target-network settings; the proposed main config has none. The experiment group explicitly chooses action clipping and whether truncations retain a bootstrap value. Device is `cpu` unless explicitly changed.
 
-`train-ddpg` creates `runs/<experiment>/<algorithm>/<environment>/<timestamp>-seed-<seed>/` and writes the resolved config, seed, Git commit, package versions, UTC start time, CPU/GPU and OS metadata, JSONL metrics, summary, and checkpoint. The summary marks a single smoke run as non-evidentiary. Future study tooling must add final status and multi-seed aggregation. Keep aggregates and figures under `reports/`, linked to raw run IDs.
+Each training command creates `runs/<experiment>/<algorithm>/<environment>/<timestamp>-seed-<seed>/` and writes the resolved config, seed, Git commit, package versions, UTC start time, CPU/GPU and OS metadata, JSONL metrics, summary, and checkpoint. The summary marks a single smoke run as non-evidentiary. Future study tooling must add final status and multi-seed aggregation. Keep aggregates and figures under `reports/`, linked to raw run IDs.
 
 ## Reproducibility and comparison policy
 
@@ -107,4 +112,4 @@ The source asks whether removing the target actor preserves stability and return
 
 ## Research documents
 
-Start with [problem](docs/research/problem.md), [notation](docs/research/notation.md), and [architecture](docs/research/architecture.md). Then read the [experiment protocol](docs/research/experiments.md), [reproducibility rules](docs/research/reproducibility.md), [baseline policy](docs/research/baselines.md), and [initial decision record](docs/decisions/0001-research-scaffold.md).
+Start with [problem](docs/research/problem.md), [notation](docs/research/notation.md), and [architecture](docs/research/architecture.md). The executable proposed-method scope is recorded in [minimal shared-error implementation](docs/research/three_network_core.md). Then read the [experiment protocol](docs/research/experiments.md), [reproducibility rules](docs/research/reproducibility.md), [baseline policy](docs/research/baselines.md), and [initial decision record](docs/decisions/0001-research-scaffold.md).

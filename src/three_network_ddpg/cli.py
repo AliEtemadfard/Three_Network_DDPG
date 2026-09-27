@@ -1,4 +1,4 @@
-"""CLI for configuration, environment checks, and the verified DDPG baseline."""
+"""CLI for configuration, environment checks, and executable research algorithms."""
 
 import argparse
 from collections.abc import Sequence
@@ -10,13 +10,25 @@ from .algorithms.registry import ALGORITHMS
 from .config import load_config
 from .core.seeds import seed_environment, seed_everything
 from .environments import make_environment
-from .experiment import run_ddpg_experiment
+from .experiment import run_ddpg_experiment, run_three_network_experiment
+
+
+def _add_train_arguments(parser: argparse.ArgumentParser, *, default_experiment: str) -> None:
+    parser.add_argument(
+        "--environment",
+        choices=("tiny_continuous", "pendulum_v1"),
+        default="pendulum_v1",
+    )
+    parser.add_argument("--experiment", default=default_experiment)
+    parser.add_argument("--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE")
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="three-network-ddpg",
-        description="Research CLI with a verified DDPG baseline; proposed algorithms remain planned.",
+        description=(
+            "Research CLI with verified DDPG and an experimental minimal shared-error three-network method."
+        ),
     )
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("algorithms", help="List algorithm capability metadata and status")
@@ -30,12 +42,13 @@ def build_parser() -> argparse.ArgumentParser:
     smoke_parser.add_argument("--environment", choices=("tiny_continuous", "pendulum_v1"), required=True)
     smoke_parser.add_argument("--steps", type=int, required=True)
     smoke_parser.add_argument("--seed", type=int, required=True)
-    train_parser = sub.add_parser("train-ddpg", help="Run one local DDPG experiment and save metadata")
-    train_parser.add_argument(
-        "--environment", choices=("tiny_continuous", "pendulum_v1"), default="pendulum_v1"
+    ddpg_parser = sub.add_parser("train-ddpg", help="Run one local DDPG experiment and save metadata")
+    _add_train_arguments(ddpg_parser, default_experiment="ddpg_baseline")
+    proposed_parser = sub.add_parser(
+        "train-three-network",
+        help="Run the minimal shared-error three-network method and save metadata",
     )
-    train_parser.add_argument("--experiment", default="ddpg_baseline")
-    train_parser.add_argument("--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE")
+    _add_train_arguments(proposed_parser, default_experiment="three_network_core")
     return parser
 
 
@@ -87,6 +100,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             run_directory = run_ddpg_experiment(config, repo_root=Path.cwd())
             print(f"DDPG smoke artifacts: {run_directory}")
+            print("This single run verifies execution and is not scientific evidence.")
+            return 0
+        if args.command == "train-three-network":
+            config = load_config(
+                algorithm="three_network_ddpg",
+                environment=args.environment,
+                experiment=args.experiment,
+                overrides=args.overrides,
+            )
+            run_directory = run_three_network_experiment(config, repo_root=Path.cwd())
+            print(f"Three-network smoke artifacts: {run_directory}")
             print("This single run verifies execution and is not scientific evidence.")
             return 0
         config = load_config(

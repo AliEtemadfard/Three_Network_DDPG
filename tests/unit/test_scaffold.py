@@ -52,6 +52,8 @@ def test_registry_metadata_and_composition(name: str) -> None:
     assert config.algorithm.is_on_policy == capabilities.is_on_policy
     if name == "ddpg":
         assert capabilities.implementation_status == "verified"
+    elif name == "three_network_ddpg":
+        assert capabilities.implementation_status == "experimental"
     else:
         assert capabilities.implementation_status == "planned"
         with pytest.raises(NotImplementedError, match="planned"):
@@ -68,11 +70,20 @@ def test_proposed_method_has_no_target_networks() -> None:
 
 
 def test_configuration_override_validation() -> None:
-    config = load_config(overrides=["algorithm.agreement_mode=current", "algorithm.alpha_prime=0.5"])
-    assert config.algorithm.agreement_mode == "current"
-    assert config.algorithm.alpha_prime == 0.5
-    with pytest.raises(ValueError, match="backtracking_factor"):
-        load_config(overrides=["algorithm.guard.backtracking_factor=1"])
+    config = load_config(
+        overrides=[
+            "algorithm.update_schedule=simultaneous",
+            "algorithm.actor_state_source=current",
+            "algorithm.diagnostic_frequency=null",
+        ]
+    )
+    assert config.algorithm.update_schedule == "simultaneous"
+    assert config.algorithm.actor_state_source == "current"
+    assert config.algorithm.diagnostic_frequency is None
+    with pytest.raises(ValueError, match="agreement mode none"):
+        load_config(overrides=["algorithm.agreement_mode=current"])
+    with pytest.raises(ValueError, match="sequential or simultaneous"):
+        load_config(overrides=["algorithm.update_schedule=guarded"])
 
 
 def test_cli_help_and_inspection(capsys: pytest.CaptureFixture[str]) -> None:
@@ -81,7 +92,9 @@ def test_cli_help_and_inspection(capsys: pytest.CaptureFixture[str]) -> None:
     assert exc.value.code == 0
     assert "algorithms" in capsys.readouterr().out
     assert main(["algorithms"]) == 0
-    assert "a3c\tplanned\ton-policy" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "a3c\tplanned\ton-policy" in output
+    assert "three_network_ddpg\texperimental\toff-policy" in output
     assert main(["config", "validate"]) == 0
     assert "Configuration valid" in capsys.readouterr().out
 

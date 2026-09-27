@@ -6,7 +6,7 @@ from ..core.interfaces import AlgorithmCapabilities
 
 ALGORITHMS: dict[str, AlgorithmCapabilities] = {
     "ddpg": AlgorithmCapabilities("ddpg", False, True, True, "verified"),
-    "three_network_ddpg": AlgorithmCapabilities("three_network_ddpg", False, True, True, "planned"),
+    "three_network_ddpg": AlgorithmCapabilities("three_network_ddpg", False, True, True, "experimental"),
     "td3": AlgorithmCapabilities("td3", False, True, True, "planned"),
     "sac": AlgorithmCapabilities("sac", False, True, True, "planned"),
     "a2c": AlgorithmCapabilities("a2c", True, False, True, "planned"),
@@ -23,7 +23,7 @@ def get_algorithm_metadata(name: str) -> AlgorithmCapabilities:
 
 
 def create_algorithm(name: str, **kwargs: Any) -> Any:
-    """Construct a reviewed algorithm; refuse all placeholders."""
+    """Construct an implemented algorithm and refuse placeholders."""
     metadata = get_algorithm_metadata(name)
     if metadata.implementation_status == "planned":
         raise NotImplementedError(f"{name} is planned; no training implementation is available")
@@ -31,4 +31,8 @@ def create_algorithm(name: str, **kwargs: Any) -> Any:
         from .ddpg import DDPG
 
         return DDPG.from_config(**kwargs)
+    if name == "three_network_ddpg":
+        from .three_network_ddpg import ThreeNetworkDDPG
+
+        return ThreeNetworkDDPG.from_config(**kwargs)
     raise NotImplementedError(f"no constructor registered for {name}")
