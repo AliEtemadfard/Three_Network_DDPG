@@ -29,6 +29,7 @@ actor_state_source: next
 critic_initialization: independent
 actor_update_delay: 1
 guard:
+  scope: joint
   tolerance: 0.0
   backtracking_factor: 0.5
   maximum_retries: 5

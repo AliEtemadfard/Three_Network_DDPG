@@ -38,7 +38,13 @@ class NoLearningOffPolicy(OffPolicyAlgorithm):
     def observe_transition(self, transition: Transition) -> None:
         self.transitions.append(transition)
 
-    def update_from_batch(self, batch: TransitionBatch) -> UpdateResult:
+    def update_from_batch(
+        self,
+        batch: TransitionBatch,
+        *,
+        validation_batch: TransitionBatch | None = None,
+    ) -> UpdateResult:
+        assert validation_batch is None
         self.batches.append(batch)
         return UpdateResult(
             metrics=(MetricRecord("test_update", float(len(self.batches)), len(self.batches), "train"),),

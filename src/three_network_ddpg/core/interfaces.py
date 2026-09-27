@@ -102,13 +102,23 @@ class Algorithm(ABC):
 class OffPolicyAlgorithm(Algorithm):
     """Only this interface participates in a replay-driven trainer."""
 
+    @property
+    def requires_validation_batch(self) -> bool:
+        """Whether the trainer must draw a separate monitoring batch."""
+        return False
+
     @abstractmethod
     def observe_transition(self, transition: Transition) -> None:
         """Receive the unmodified transition after environment interaction."""
 
     @abstractmethod
-    def update_from_batch(self, batch: TransitionBatch) -> UpdateResult:
-        """Apply algorithm-owned updates using an off-policy replay sample."""
+    def update_from_batch(
+        self,
+        batch: TransitionBatch,
+        *,
+        validation_batch: TransitionBatch | None = None,
+    ) -> UpdateResult:
+        """Apply updates and optionally monitor a separately sampled batch."""
 
 
 class OnPolicyAlgorithm(Algorithm):

@@ -27,7 +27,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="three-network-ddpg",
         description=(
-            "Research CLI with verified DDPG and an experimental minimal shared-error three-network method."
+            "Research CLI with verified DDPG and an experimental three-network method "
+            "with controlled ablations."
         ),
     )
     sub = parser.add_subparsers(dest="command", required=True)
@@ -46,7 +47,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_train_arguments(ddpg_parser, default_experiment="ddpg_baseline")
     proposed_parser = sub.add_parser(
         "train-three-network",
-        help="Run the minimal shared-error three-network method and save metadata",
+        help="Run the experimental three-network method and save metadata",
     )
     _add_train_arguments(proposed_parser, default_experiment="three_network_core")
     return parser

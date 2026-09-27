@@ -125,5 +125,5 @@ def run_ddpg_experiment(config: DictConfig, *, repo_root: Path) -> Path:
 
 
 def run_three_network_experiment(config: DictConfig, *, repo_root: Path) -> Path:
-    """Train and evaluate the minimal shared-error three-network method once."""
+    """Train and evaluate the experimental three-network method once."""
     return _run_off_policy_experiment(config, repo_root=repo_root, expected_algorithm="three_network_ddpg")

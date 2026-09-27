@@ -27,7 +27,7 @@ class Transition:
         if not np.isfinite(self.reward):
             raise ValueError("reward must be finite")
         for name in ("terminated", "truncated"):
-            if not isinstance(getattr(self, name), (bool, np.bool_)):
+            if not isinstance(getattr(self, name), bool | np.bool_):
                 raise TypeError(f"{name} must be boolean")
 
 

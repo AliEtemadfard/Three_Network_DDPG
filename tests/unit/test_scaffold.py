@@ -72,18 +72,35 @@ def test_proposed_method_has_no_target_networks() -> None:
 def test_configuration_override_validation() -> None:
     config = load_config(
         overrides=[
-            "algorithm.update_schedule=simultaneous",
+            "algorithm.agreement_mode=both",
+            "algorithm.alpha=0.2",
+            "algorithm.alpha_prime=0.3",
+            "algorithm.beta_regularizer.mode=l2_y",
+            "algorithm.beta_regularizer.coefficient=0.01",
+            "algorithm.update_schedule=guarded",
+            "algorithm.guard.scope=critics",
             "algorithm.actor_state_source=current",
             "algorithm.diagnostic_frequency=null",
         ]
     )
-    assert config.algorithm.update_schedule == "simultaneous"
+    assert config.algorithm.agreement_mode == "both"
+    assert config.algorithm.beta_regularizer.mode == "l2_y"
+    assert config.algorithm.update_schedule == "guarded"
+    assert config.algorithm.guard.scope == "critics"
     assert config.algorithm.actor_state_source == "current"
     assert config.algorithm.diagnostic_frequency is None
-    with pytest.raises(ValueError, match="agreement mode none"):
-        load_config(overrides=["algorithm.agreement_mode=current"])
-    with pytest.raises(ValueError, match="sequential or simultaneous"):
-        load_config(overrides=["algorithm.update_schedule=guarded"])
+    with pytest.raises(ValueError, match="current agreement does not use alpha"):
+        load_config(
+            overrides=[
+                "algorithm.agreement_mode=current",
+                "algorithm.alpha=0.1",
+                "algorithm.alpha_prime=0.1",
+            ]
+        )
+    with pytest.raises(ValueError, match="beta mode none"):
+        load_config(overrides=["algorithm.beta_regularizer.coefficient=0.1"])
+    with pytest.raises(ValueError, match="guard.scope"):
+        load_config(overrides=["algorithm.guard.scope=invalid"])
 
 
 def test_cli_help_and_inspection(capsys: pytest.CaptureFixture[str]) -> None:

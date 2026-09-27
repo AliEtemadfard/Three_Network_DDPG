@@ -1,6 +1,6 @@
 # Three Network DDPG
 
-**Status:** The standard four-network DDPG baseline is verified by focused CPU tests. The minimal proposed three-network method is implemented as an experimental shared-error-only core. Agreement penalties, beta regularization, guarded updates, TD3, SAC, A2C, and A3C remain unimplemented. The [original research specification](docs/research/source/Three_Network_DDPG_Research_Specification.docx) is preserved verbatim.
+**Status:** The standard four-network DDPG baseline is verified by focused CPU tests. The proposed target-free three-network method now has an experimental executable core with controlled agreement, beta, simultaneous, sequential, and guarded ablations. TD3, SAC, A2C, and A3C remain unimplemented. The [original research specification](docs/research/source/Three_Network_DDPG_Research_Specification.docx) is preserved verbatim.
 
 DDPG uses a deterministic actor and a value critic, usually with slowly updated target copies of both networks. Target networks reduce movement in the bootstrap target but do not establish general convergence for nonlinear actor–critic learning. They also add parameter storage. This project asks whether one actor and two independently optimized critics can maintain a useful Bellman relation without target networks in the proposed main variant.
 
@@ -35,16 +35,16 @@ With an explicitly chosen bootstrap mask `m`, the shared residual is `δ = r + �
 
 **Warning:** The original linear beta term can drive negative `Y` values downward and does not bound their magnitude. Linear and quadratic variants are research alternatives. The final objective and convergence statement remain unresolved; see [open questions](docs/research/open_questions.md).
 
-### Executable minimal variant
+### Executable controlled variant
 
-The implemented proposed variant uses exactly one actor and two independently initialized critics. It minimizes only `0.5 * mean(delta ** 2)` for each critic with the other critic output fixed, and maximizes Critic Two for the actor. It has no target modules. `sequential` recomputes after each Critic Two -> Critic One -> actor step; `simultaneous` stores all gradients from one pre-update snapshot before any optimizer step. Next-state actor input is the default; current-state input is an executable ablation. See [minimal shared-error implementation](docs/research/three_network_core.md) for the complete scope and deviations from the source specification.
+The proposed implementation uses one actor and two independently initialized critics with no target modules. The shared-error-only setting remains the reference. Agreement modes none, current, next, and both; beta modes none, experimental linear_y, l2_y, and l2_y_z; and schedules sequential, simultaneous, and guarded are executable. A guard can cover the joint update, critics, or actor, and can monitor a separate replay batch. Next-state actor input remains the reconstructed default. See [three-network controlled implementation](docs/research/three_network_core.md) for formulas, detach rules, and limits.
 
 ## Roadmap
 
 1. Maintain and empirically validate the implemented standard DDPG baseline on Pendulum and later tasks.
-2. Maintain and empirically validate the implemented minimal shared-error method and its verified gradient paths.
-3. Ablate no, current, next, and both critic-agreement penalties.
-4. Ablate beta regularizers, simultaneous/alternating/guarded schedules, actor state source, initialization, and actor delay.
+2. Maintain and empirically validate the implemented shared-error reference and its verified gradient paths.
+3. Evaluate the implemented no, current, next, and both critic-agreement modes.
+4. Evaluate the implemented beta and schedule ablations; actor state source, initialization, and actor delay remain separate research axes.
 5. Run fair multi-seed studies and failure analysis.
 6. Refine a local descent theory for the selected implementation and its actual assumptions.
 7. Review novelty against target-free, residual-gradient, and twin-critic literature before framing a contribution.
@@ -65,6 +65,14 @@ three-network-ddpg env-smoke --environment tiny_continuous --steps 6 --seed 2
 three-network-ddpg env-smoke --environment pendulum_v1 --steps 3 --seed 2
 three-network-ddpg train-ddpg --environment pendulum_v1 --experiment ddpg_baseline
 three-network-ddpg train-three-network --environment pendulum_v1 --experiment three_network_core
+three-network-ddpg train-three-network --environment tiny_continuous --experiment three_network_core \
+  --set experiment.total_steps=24 --set experiment.warmup_steps=4 \
+  --set experiment.batch_size=4 --set algorithm.hidden_layers=[16,16] \
+  --set algorithm.agreement_mode=both --set algorithm.alpha=0.1 \
+  --set algorithm.alpha_prime=0.1 --set algorithm.beta_regularizer.mode=l2_y \
+  --set algorithm.beta_regularizer.coefficient=0.0001 \
+  --set algorithm.update_schedule=guarded --set algorithm.guard.scope=joint \
+  --set algorithm.guard.validation_batch=true
 python -m pytest
 ruff check .
 ruff format --check .
@@ -92,7 +100,7 @@ To add an algorithm, document its capability metadata and experimental role, add
 
 ## Configurations and outputs
 
-`conf/config.yaml` selects one algorithm, environment, and experiment group. `config validate` composes them with OmegaConf and checks the required schema and cross-field constraints. The proposed-method config executes only the shared-error core and rejects nonzero alpha values, beta regularization, guarded updates, target networks, identical critic initialization, and delayed actor updates. It supports sequential or simultaneous schedules, current or next actor state input, and optional actor/residual gradient diagnostics. DDPG and TD3 configs reserve their own target-network settings; the proposed main config has none. The experiment group explicitly chooses action clipping and whether truncations retain a bootstrap value. Device is `cpu` unless explicitly changed.
+The packaged YAML groups compose with OmegaConf and validate cross-field constraints. The proposed method supports explicit agreement and beta modes, sequential, simultaneous, and guarded schedules, current or next actor input, guard scope and backtracking settings, optional validation-batch monitoring, and interval-controlled gradient diagnostics. It still rejects target networks, identical critic initialization, and delayed actor updates. DDPG and TD3 reserve their own target-network settings. Device is cpu unless explicitly changed.
 
 Each training command creates `runs/<experiment>/<algorithm>/<environment>/<timestamp>-seed-<seed>/` and writes the resolved config, seed, Git commit, package versions, UTC start time, CPU/GPU and OS metadata, JSONL metrics, summary, and checkpoint. The summary marks a single smoke run as non-evidentiary. Future study tooling must add final status and multi-seed aggregation. Keep aggregates and figures under `reports/`, linked to raw run IDs.
 
@@ -112,4 +120,4 @@ The source asks whether removing the target actor preserves stability and return
 
 ## Research documents
 
-Start with [problem](docs/research/problem.md), [notation](docs/research/notation.md), and [architecture](docs/research/architecture.md). The executable proposed-method scope is recorded in [minimal shared-error implementation](docs/research/three_network_core.md). Then read the [experiment protocol](docs/research/experiments.md), [reproducibility rules](docs/research/reproducibility.md), [baseline policy](docs/research/baselines.md), and [initial decision record](docs/decisions/0001-research-scaffold.md).
+Start with [problem](docs/research/problem.md), [notation](docs/research/notation.md), and [architecture](docs/research/architecture.md). The executable proposed-method scope is recorded in [three-network controlled implementation](docs/research/three_network_core.md). Then read the [experiment protocol](docs/research/experiments.md), [reproducibility rules](docs/research/reproducibility.md), [baseline policy](docs/research/baselines.md), and [initial decision record](docs/decisions/0001-research-scaffold.md).

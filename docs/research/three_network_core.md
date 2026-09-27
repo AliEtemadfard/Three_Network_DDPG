@@ -1,82 +1,75 @@
-# Minimal shared-error implementation
+# Three-network controlled implementation
 
-## Implemented scope
+## Fixed method contract
 
-The experimental `three_network_ddpg` implementation contains one bounded
-deterministic actor, Critic One, and Critic Two. The critics are initialized
-independently and use separate Adam optimizers. The main variant has no target
-actor, target critic, soft update, copied critic, or delayed parameter path.
+The experimental three_network_ddpg implementation contains one bounded deterministic actor, Critic One, and Critic Two. The critics start independently and use separate Adam optimizers. No target actor, target critic, soft update, copied critic, or delayed parameter path exists in this variant.
 
-For every replay batch, with `a_next = actor(s_next)` detached during critic
-updates:
+For every replay batch, with a_next = actor(s_next) detached during critic updates:
 
-- `Y = critic_one(s, a)`
-- `Y1 = critic_one(s_next, a_next)`
-- `Z1 = critic_two(s, a)`
-- `Z = critic_two(s_next, a_next)`
-- `delta = r + gamma * bootstrap_mask * Z - Y`
-- `shared_squared_error = 0.5 * mean(delta ** 2)`
+- Y = critic_one(s, a)
+- Y1 = critic_one(s_next, a_next)
+- Z1 = critic_two(s, a)
+- Z = critic_two(s_next, a_next)
+- delta = r + gamma * bootstrap_mask * Z - Y
+- shared_squared_error = 0.5 * mean(delta ** 2)
 
-Critic Two differentiates this loss through `Z` while treating `Y` as
-fixed. Critic One differentiates it through `Y` while treating `Z` as
-fixed. The actor minimizes
-`-mean(critic_two(actor_state, actor(actor_state)))`; `actor_state` defaults
-to `s_next` and can be set to `s`. Both critics are frozen during that
-forward and backward pass, while the path from Critic Two's action input to the
-actor remains connected.
+Critic Two differentiates through Z while treating Y as fixed. Critic One differentiates through Y while treating Z as fixed. The actor minimizes -mean(critic_two(actor_state, actor(actor_state))); actor_state defaults to s_next and can be set to s. Both critics are frozen during the actor backward pass, while the action to actor path remains connected.
+
+## Agreement ablations
+
+The selectable agreement modes are:
+
+- none: no agreement term.
+- current: Critic Two adds alpha_prime * 0.5 * mean((Z1 - Y.detach()) ** 2).
+- next: Critic One adds alpha * 0.5 * mean((Y1 - Z.detach()) ** 2).
+- both: applies both terms in their respective critic phases.
+
+Inactive coefficients must be zero. Agreement penalties can rotate critic updates away from shared error descent, so positive coefficients imply no convergence result.
+
+## Beta ablations
+
+Critic One can add beta_coefficient times one of:
+
+- none: 0.
+- linear_y: mean(Y), labeled experimental and unbounded below.
+- l2_y: 0.5 * mean(Y ** 2).
+- l2_y_z: 0.5 * mean(Y ** 2 + Z.detach() ** 2).
+
+The final mode reports both magnitudes, but the detached Z component cannot update Critic Two from Critic One's phase. This follows the documented provisional Critic One objective and is a known limitation of this ablation, not a claimed solution.
 
 ## Schedules
 
-`sequential` applies Critic Two, Critic One, then actor updates. Critic One
-recomputes Critic Two's bootstrap value after the Critic Two step. The actor
-uses the updated Critic Two. This is the concrete interpretation of the
-specification's recommended sequential pseudocode.
+sequential applies Critic Two, Critic One, and actor updates in that order. Critic One recomputes Critic Two's bootstrap after the Critic Two step, and the actor uses the updated Critic Two.
 
-`simultaneous` computes and stores all three parameter-gradient sets from one
-pre-update parameter snapshot. No optimizer steps before all gradient sets are
-stored. Optimizer steps then apply the stored Critic Two, Critic One, and actor
-gradients.
+simultaneous computes and stores all three parameter gradient sets from one pre-update snapshot. Optimizer steps begin only after all gradient sets are stored.
+
+guarded uses sequential proposals and an update-batch shared error acceptance check. The guard can cover joint, critics, or actor. Every retry restores module parameters and optimizer states to the same snapshot, scales the relevant candidate learning rates by backtracking_factor ** retry, and checks error_after <= error_before + tolerance. A failed proposal is restored. Candidate rates do not accumulate across learner updates.
+
+For a critics guard, the actor runs after the decision even if the critic proposal is rejected. For an actor guard, critic phases run before the actor snapshot and remain committed if the actor proposal is rejected. A joint rejection applies no phase.
+
+When validation_batch is enabled, the trainer samples a second replay batch. Its shared error change is logged for monitoring and does not participate in acceptance.
 
 ## Diagnostics
 
-Every learner update logs the signed and absolute residual means, the shared
-squared error, losses, gradient norms, actor objective, and mean, standard
-deviation, mean absolute value, and maximum absolute value for `Y`, `Y1`,
-`Z1`, and `Z`. It also logs aggregate Q magnitude. The trainer separately
-logs episode return and length.
+Each learner update logs signed and absolute residual means, shared squared error, both raw agreement errors, component losses, gradient norms, actor objective, and statistics for Y, Y1, Z1, and Z.
 
-When `diagnostic_frequency` is a positive integer, the implementation measures
-the inner product and cosine between the actor-loss gradient and the shared
-error gradient with respect to actor parameters. It uses separate
-`torch.autograd.grad` calls and never writes these diagnostic gradients into
-optimizer state. Set the field to `null` to disable this diagnostic.
+Guard metrics include accepted and rejected indicators and totals, retry count, candidate learning rate and scale, update-batch error before and after, committed error after restoration or acceptance, and validation-batch change when configured.
 
-## Deliberate deviations and unresolved choices
+At a positive diagnostic_frequency, separate torch.autograd.grad calls measure:
 
-- The source board expression omitted terminal handling. The implementation
-  multiplies `Z` by the replay buffer's explicit bootstrap mask. Terminated and
-  truncated flags remain separate; `bootstrap_on_truncation` chooses the
-  truncation policy.
-- Agreement penalties are absent. `Y1` and `Z1` are diagnostic outputs only.
-  Nonzero alpha values or an agreement mode other than `none` are rejected.
-- Beta regularization is absent. Nonzero coefficients and all beta modes other
-  than `none` are rejected.
-- Guarded and legacy `alternating` schedule labels are rejected by this
-  implementation. Only the precisely defined `sequential` and `simultaneous`
-  schedules execute.
-- Critics must use independent initialization. Identical initialization remains
-  a future ablation.
-- The actor updates on every learner step. Delayed actor updates remain a future
-  ablation.
-- Adam is the only implemented optimizer. Gradient clipping remains optional
-  and disabled by default.
-- The loss uses a batch mean and the specified factor of one half. This records
-  the mean-versus-sum choice left open by the reconstruction.
-- Metrics are measured on the update batch; this does not establish behavior on
-  the replay distribution or on unseen transitions.
-- Gaussian exploration is used only for collection. Evaluation is deterministic.
-- No agreement, beta, guard, target-network, convergence, optimality, monotonic
-  return, efficiency, or novelty claim follows from this implementation.
+- the inner product and cosine between Critic One's total objective and shared-error gradients;
+- the same pair for Critic Two;
+- the actor objective and shared-error gradient interaction with respect to actor parameters.
 
-This core establishes executable gradient paths and diagnostics. Scientific
-comparison still requires planned multi-seed experiments and theory work.
+These calls do not write optimizer gradients or alter the training update.
+
+## Deliberate deviations and limits
+
+- The source expression omitted terminal handling. The implementation uses the explicit replay bootstrap mask and preserves separate terminated and truncated flags.
+- All reductions use a batch mean and the shared error includes the specified factor of one half.
+- Independent critic initialization, actor delay of one, and Adam remain fixed implementation constraints.
+- Gaussian exploration is collection only. Evaluation is deterministic.
+- Guard acceptance applies to one sampled batch. Validation is observational. Neither establishes replay-distribution descent or return improvement.
+- No agreement, beta, guard, convergence, optimality, monotonic return, efficiency, or novelty claim follows from this implementation.
+
+The implementation supplies controlled mechanisms and diagnostics for unit and smoke verification. Scientific comparison still requires planned multi-seed experiments and theory work.

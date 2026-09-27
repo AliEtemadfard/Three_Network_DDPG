@@ -59,7 +59,7 @@ def load_config(
 
 
 def _number(value: Any, *, positive: bool = False, nonnegative: bool = False) -> bool:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+    if isinstance(value, bool) or not isinstance(value, int | float):
         return False
     return value > 0 if positive else value >= 0 if nonnegative else True
 
@@ -86,12 +86,20 @@ def validate_config(config: DictConfig) -> None:
     if algorithm.name == "three_network_ddpg":
         if "target_networks" in algorithm:
             errors.append("proposed main variant must not define target networks")
-        if algorithm.agreement_mode != "none" or algorithm.alpha != 0 or algorithm.alpha_prime != 0:
-            errors.append("minimal three-network core requires agreement mode none and zero alphas")
-        if algorithm.beta_regularizer.mode != "none" or algorithm.beta_regularizer.coefficient != 0:
-            errors.append("minimal three-network core requires beta regularization to be disabled")
-        if algorithm.update_schedule not in {"sequential", "simultaneous"}:
-            errors.append("minimal three-network core supports sequential or simultaneous updates")
+        if algorithm.agreement_mode == "none" and (algorithm.alpha != 0 or algorithm.alpha_prime != 0):
+            errors.append("agreement mode none requires zero alpha coefficients")
+        if algorithm.agreement_mode == "current" and algorithm.alpha != 0:
+            errors.append("current agreement does not use alpha")
+        if algorithm.agreement_mode == "next" and algorithm.alpha_prime != 0:
+            errors.append("next agreement does not use alpha_prime")
+        beta_mode = algorithm.beta_regularizer.mode
+        beta_coefficient = algorithm.beta_regularizer.coefficient
+        if beta_mode == "none" and beta_coefficient != 0:
+            errors.append("beta mode none requires a zero coefficient")
+        if beta_mode != "none" and beta_coefficient == 0:
+            errors.append("an active beta mode requires a positive coefficient")
+        if algorithm.update_schedule not in {"sequential", "simultaneous", "guarded"}:
+            errors.append("three-network updates must be sequential, simultaneous, or guarded")
         if algorithm.critic_initialization != "independent":
             errors.append("minimal three-network core requires independent critic initialization")
         if algorithm.actor_update_delay != 1:
@@ -160,6 +168,8 @@ def validate_config(config: DictConfig) -> None:
     ):
         errors.append("algorithm.diagnostic_frequency must be null or a positive integer")
     guard = algorithm.guard
+    if guard.scope not in {"joint", "critics", "actor"}:
+        errors.append("algorithm.guard.scope must be joint, critics, or actor")
     if not _number(guard.tolerance, nonnegative=True):
         errors.append("algorithm.guard.tolerance must be nonnegative")
     if not _number(guard.backtracking_factor, positive=True) or (guard.backtracking_factor >= 1):
@@ -168,11 +178,21 @@ def validate_config(config: DictConfig) -> None:
         errors.append("algorithm.guard.maximum_retries must be nonnegative")
     if not _number(guard.minimum_learning_rate, positive=True):
         errors.append("algorithm.guard.minimum_learning_rate must be positive")
+    else:
+        learning_rates = (
+            algorithm.actor_learning_rate,
+            algorithm.critic_one_learning_rate,
+            algorithm.critic_two_learning_rate,
+        )
+        if all(_number(rate, positive=True) for rate in learning_rates) and (
+            guard.minimum_learning_rate > min(learning_rates)
+        ):
+            errors.append("algorithm.guard.minimum_learning_rate exceeds a learning rate")
     if not isinstance(guard.validation_batch, bool):
         errors.append("algorithm.guard.validation_batch must be boolean")
     if (
         not environment.id
-        or not isinstance(environment.wrappers, (list,))
+        or not isinstance(environment.wrappers, list)
         and not (OmegaConf.is_list(environment.wrappers))
     ):
         errors.append("environment id and wrappers are required")

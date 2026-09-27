@@ -254,7 +254,14 @@ class DDPG(OffPolicyAlgorithm):
     def observe_transition(self, transition: Transition) -> None:
         self._environment_steps += 1
 
-    def update_from_batch(self, batch: TransitionBatch) -> UpdateResult:
+    def update_from_batch(
+        self,
+        batch: TransitionBatch,
+        *,
+        validation_batch: TransitionBatch | None = None,
+    ) -> UpdateResult:
+        if validation_batch is not None:
+            raise ValueError("DDPG does not consume a validation batch during updates")
         batch = batch.to(self.device)
         with torch.no_grad():
             next_actions = self.target_actor(batch.next_observations)

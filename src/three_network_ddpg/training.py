@@ -124,7 +124,16 @@ class OffPolicyTrainer:
             episode_return += float(reward)
             episode_length += 1
             if step + 1 > self.settings.warmup_steps and len(self.replay) >= self.settings.batch_size:
-                result = self.algorithm.update_from_batch(self.replay.sample(self.settings.batch_size))
+                training_batch = self.replay.sample(self.settings.batch_size)
+                validation_batch = (
+                    self.replay.sample(self.settings.batch_size)
+                    if self.algorithm.requires_validation_batch
+                    else None
+                )
+                result = self.algorithm.update_from_batch(
+                    training_batch,
+                    validation_batch=validation_batch,
+                )
                 if not isinstance(result, UpdateResult):
                     raise TypeError("algorithm update must return UpdateResult")
                 gradient_updates += result.updates_applied
