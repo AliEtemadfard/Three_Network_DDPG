@@ -1,7 +1,8 @@
-"""Inspection and random-environment smoke CLI; no learning command exists."""
+"""CLI for configuration, environment checks, and the verified DDPG baseline."""
 
 import argparse
 from collections.abc import Sequence
+from pathlib import Path
 
 from omegaconf import OmegaConf
 
@@ -9,12 +10,13 @@ from .algorithms.registry import ALGORITHMS
 from .config import load_config
 from .core.seeds import seed_environment, seed_everything
 from .environments import make_environment
+from .experiment import run_ddpg_experiment
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="three-network-ddpg",
-        description="Research core: inspect configs and exercise environments; no learning algorithm yet.",
+        description="Research CLI with a verified DDPG baseline; proposed algorithms remain planned.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("algorithms", help="List algorithm capability metadata and status")
@@ -28,6 +30,12 @@ def build_parser() -> argparse.ArgumentParser:
     smoke_parser.add_argument("--environment", choices=("tiny_continuous", "pendulum_v1"), required=True)
     smoke_parser.add_argument("--steps", type=int, required=True)
     smoke_parser.add_argument("--seed", type=int, required=True)
+    train_parser = sub.add_parser("train-ddpg", help="Run one local DDPG experiment and save metadata")
+    train_parser.add_argument(
+        "--environment", choices=("tiny_continuous", "pendulum_v1"), default="pendulum_v1"
+    )
+    train_parser.add_argument("--experiment", default="ddpg_baseline")
+    train_parser.add_argument("--set", dest="overrides", action="append", default=[], metavar="KEY=VALUE")
     return parser
 
 
@@ -70,6 +78,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "env-smoke":
             _environment_smoke(args.environment, args.steps, args.seed)
             return 0
+        if args.command == "train-ddpg":
+            config = load_config(
+                algorithm="ddpg",
+                environment=args.environment,
+                experiment=args.experiment,
+                overrides=args.overrides,
+            )
+            run_directory = run_ddpg_experiment(config, repo_root=Path.cwd())
+            print(f"DDPG smoke artifacts: {run_directory}")
+            print("This single run verifies execution and is not scientific evidence.")
+            return 0
         config = load_config(
             algorithm=args.algorithm,
             environment=args.environment,
@@ -81,5 +100,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.action == "show":
         print(OmegaConf.to_yaml(config, resolve=True), end="")
     else:
-        print("Configuration valid (algorithm implementation remains planned).")
+        status = config.algorithm.implementation_status
+        print(f"Configuration valid (algorithm status: {status}).")
     return 0

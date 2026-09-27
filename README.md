@@ -1,6 +1,6 @@
 # Three Network DDPG
 
-**Status:** Executable research core with typed batches, replay, action utilities, environments, trainer shell, and evaluator. No named learning algorithm is implemented. The [original research specification](docs/research/source/Three_Network_DDPG_Research_Specification.docx) is preserved verbatim.
+**Status:** The standard four-network DDPG baseline is implemented and verified by focused CPU tests. The proposed three-network method and all other learning algorithms remain unimplemented. The [original research specification](docs/research/source/Three_Network_DDPG_Research_Specification.docx) is preserved verbatim.
 
 DDPG uses a deterministic actor and a value critic, usually with slowly updated target copies of both networks. Target networks reduce movement in the bootstrap target but do not establish general convergence for nonlinear actorâ€“critic learning. They also add parameter storage. This project asks whether one actor and two independently optimized critics can maintain a useful Bellman relation without target networks in the proposed main variant.
 
@@ -37,7 +37,7 @@ With an explicitly chosen bootstrap mask `m`, the shared residual is `Î´ = r + Î
 
 ## Roadmap
 
-1. Implement and verify standard DDPG on a small continuous-control task, then Pendulum.
+1. Maintain and empirically validate the implemented standard DDPG baseline on Pendulum and later tasks.
 2. Implement the minimal three-network shared-error method and verify every gradient path.
 3. Ablate no, current, next, and both critic-agreement penalties.
 4. Ablate beta regularizers, simultaneous/alternating/guarded schedules, actor state source, initialization, and actor delay.
@@ -47,7 +47,7 @@ With an explicitly chosen bootstrap mask `m`, the shared residual is `Î´ = r + Î
 
 ## Set up and commands that work now
 
-Use Python 3.11 and CPU by default. The environment file installs the editable package with development tools. The smoke command exercises a seeded random policy without training an agent.
+Use Python 3.11 and CPU by default. The environment file installs the editable package with development tools. The environment smoke command exercises a seeded random policy. The DDPG command performs a short local learning run and records artifacts; its default budget is for execution checks, not scientific comparison.
 
 ~~~bash
 conda env create -f environment.yml
@@ -59,6 +59,7 @@ three-network-ddpg config validate
 three-network-ddpg config show
 three-network-ddpg env-smoke --environment tiny_continuous --steps 6 --seed 2
 three-network-ddpg env-smoke --environment pendulum_v1 --steps 3 --seed 2
+three-network-ddpg train-ddpg --environment pendulum_v1 --experiment ddpg_baseline
 python -m pytest
 ruff check .
 ruff format --check .
@@ -66,7 +67,7 @@ ruff format --check .
 
 For local TensorBoard or plotting support, install `.[tracking]` or `.[plotting]`. Weights & Biases remains optional under `.[wandb]`. No account or network service is required for default local tracking.
 
-**Available Python APIs:** `ReplayBuffer`, `OffPolicyTrainer`, `evaluate`, `make_environment`, action transforms, seed helpers, and `prepare_run_directory`. Tests use a no-learning algorithm test double. **Planned CLI commands:** learning, evaluation runs, checkpoint management, and plotting. Registry algorithms remain `planned` and cannot enter the trainer.
+**Available:** `DDPG`, `ReplayBuffer`, `OffPolicyTrainer`, `evaluate`, `make_environment`, action transforms, seed helpers, and `prepare_run_directory`. `train-ddpg` writes resolved configuration, metadata, JSONL metrics, a summary, and a checkpoint. TD3, SAC, A2C, A3C, and the proposed method remain `planned` and cannot enter the trainer. Plotting and general checkpoint-management commands are planned.
 
 ## Layout and extension points
 
@@ -88,7 +89,7 @@ To add an algorithm, document its capability metadata and experimental role, add
 
 `conf/config.yaml` selects one algorithm, environment, and experiment group. `config validate` composes them with OmegaConf and checks the required schema and cross-field constraints. The default proposed-method config is a **design placeholder**, not a selected scientific conclusion. It reserves alpha, alpha-prime, beta mode, schedule, state source, initialization, guarded-update controls, actor delay, and diagnostic frequency. DDPG and TD3 configs reserve their own target-network settings; the proposed main config has none. The experiment group explicitly chooses action clipping and whether truncations retain a bootstrap value. Device is `cpu` unless explicitly changed.
 
-`prepare_run_directory` creates `runs/<experiment>/<algorithm>/<environment>/<timestamp>-seed-<seed>/` and writes the resolved config, seed, Git commit, package versions, UTC start time, and CPU/GPU and OS metadata. It does not start training or write results. Future runs must add UTC end time, raw CSV/JSONL, optional TensorBoard events, checkpoints, and status. Keep aggregates and figures under `reports/`, linked to raw run IDs.
+`train-ddpg` creates `runs/<experiment>/<algorithm>/<environment>/<timestamp>-seed-<seed>/` and writes the resolved config, seed, Git commit, package versions, UTC start time, CPU/GPU and OS metadata, JSONL metrics, summary, and checkpoint. The summary marks a single smoke run as non-evidentiary. Future study tooling must add final status and multi-seed aggregation. Keep aggregates and figures under `reports/`, linked to raw run IDs.
 
 ## Reproducibility and comparison policy
 

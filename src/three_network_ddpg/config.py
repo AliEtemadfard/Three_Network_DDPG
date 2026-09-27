@@ -90,6 +90,18 @@ def validate_config(config: DictConfig) -> None:
             errors.append("DDPG and TD3 require explicit target-network settings")
         elif not (algorithm.target_networks.actor and algorithm.target_networks.critic):
             errors.append("DDPG and TD3 target actor and critic must be enabled")
+        elif not _number(algorithm.target_networks.tau, positive=True) or (algorithm.target_networks.tau > 1):
+            errors.append("target-network tau must be in (0, 1]")
+    if algorithm.name == "ddpg":
+        if algorithm.optimizer.name != "adam":
+            errors.append("verified DDPG currently supports the Adam optimizer")
+        if not algorithm.action_rescaling:
+            errors.append("verified DDPG requires action rescaling")
+        if algorithm.actor_update_delay != 1:
+            errors.append("standard DDPG updates its actor every update")
+        noise_clip = algorithm.exploration_noise.clip
+        if noise_clip is not None and not _number(noise_clip, positive=True):
+            errors.append("exploration noise clip must be positive when configured")
     if algorithm.agreement_mode not in _AGREEMENT:
         errors.append("algorithm.agreement_mode is invalid")
     if algorithm.beta_regularizer.mode not in _BETA:

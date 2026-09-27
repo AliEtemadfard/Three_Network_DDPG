@@ -1,0 +1,22 @@
+# Public experiment preset. Mirrors the packaged group used by the CLI.
+# These are smoke defaults for correctness checks, not paper-scale evidence.
+algorithm: ddpg
+environment: pendulum_v1
+experiment: ddpg_baseline
+overrides:
+  algorithm.device: cpu
+  algorithm.seed: 0
+  algorithm.hidden_layers: [128, 128]
+  algorithm.actor_learning_rate: 0.0003
+  algorithm.critic_one_learning_rate: 0.001
+  algorithm.gamma: 0.99
+  algorithm.target_networks.tau: 0.005
+  algorithm.exploration_noise.standard_deviation: 0.1
+  experiment.total_steps: 2000
+  experiment.warmup_steps: 256
+  experiment.batch_size: 64
+  experiment.replay_capacity: 10000
+  experiment.evaluation_frequency: 1000
+  experiment.evaluation_episodes: 2
+  experiment.bootstrap_on_truncation: true
+  experiment.clip_actions: true

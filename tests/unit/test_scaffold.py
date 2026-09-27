@@ -47,12 +47,15 @@ def test_imports_and_typed_batches() -> None:
 def test_registry_metadata_and_composition(name: str) -> None:
     capabilities = get_algorithm_metadata(name)
     config = load_config(algorithm=name)
-    assert capabilities.implementation_status == "planned"
     assert config.algorithm.name == name
     assert config.algorithm.implementation_status == capabilities.implementation_status
     assert config.algorithm.is_on_policy == capabilities.is_on_policy
-    with pytest.raises(NotImplementedError, match="planned"):
-        create_algorithm(name)
+    if name == "ddpg":
+        assert capabilities.implementation_status == "verified"
+    else:
+        assert capabilities.implementation_status == "planned"
+        with pytest.raises(NotImplementedError, match="planned"):
+            create_algorithm(name)
 
 
 def test_proposed_method_has_no_target_networks() -> None:

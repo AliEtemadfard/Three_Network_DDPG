@@ -1,6 +1,8 @@
 """Off-policy interaction shell; all update mathematics belongs to the algorithm."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from time import perf_counter
 
 import gymnasium as gym
 import numpy as np
@@ -20,6 +22,7 @@ class TrainerSettings:
     batch_size: int
     clip_actions: bool
     bootstrap_on_truncation: bool
+    evaluation_frequency: int | None = None
 
     def __post_init__(self) -> None:
         if self.total_steps <= 0 or self.batch_size <= 0:
@@ -28,6 +31,8 @@ class TrainerSettings:
             raise ValueError("warmup_steps must be in [0, total_steps)")
         if not isinstance(self.clip_actions, bool) or not isinstance(self.bootstrap_on_truncation, bool):
             raise TypeError("clip_actions and bootstrap_on_truncation must be boolean")
+        if self.evaluation_frequency is not None and self.evaluation_frequency <= 0:
+            raise ValueError("evaluation_frequency must be positive when configured")
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +40,8 @@ class TrainingSummary:
     environment_steps: int
     gradient_updates: int
     completed_episode_returns: tuple[float, ...]
+    completed_episode_lengths: tuple[int, ...]
+    wall_time_seconds: float
     metrics: tuple[MetricRecord, ...]
 
 
@@ -48,6 +55,7 @@ class OffPolicyTrainer:
         environment: gym.Env,
         replay: ReplayBuffer,
         settings: TrainerSettings,
+        evaluation_callback: Callable[[int, OffPolicyAlgorithm], tuple[MetricRecord, ...]] | None = None,
     ) -> None:
         if not isinstance(algorithm, OffPolicyAlgorithm):
             raise TypeError("off-policy trainer requires OffPolicyAlgorithm")
@@ -67,18 +75,24 @@ class OffPolicyTrainer:
             raise ValueError("replay and trainer truncation policies differ")
         if settings.batch_size > replay.capacity:
             raise ValueError("batch_size exceeds replay capacity")
+        if (settings.evaluation_frequency is None) != (evaluation_callback is None):
+            raise ValueError("evaluation frequency and callback must be configured together")
         self.algorithm = algorithm
         self.environment = environment
         self.replay = replay
         self.settings = settings
+        self.evaluation_callback = evaluation_callback
 
     def run(self, *, seed: int, deterministic_algorithms: bool = False) -> TrainingSummary:
         """Collect transitions, sample replay, and delegate updates."""
+        started = perf_counter()
         seed_everything(seed, deterministic_algorithms=deterministic_algorithms)
         observation, _ = seed_environment(self.environment, seed)
         self.algorithm.set_evaluation_mode(False)
         episode_return = 0.0
+        episode_length = 0
         completed_returns: list[float] = []
+        completed_lengths: list[int] = []
         metrics: list[MetricRecord] = []
         gradient_updates = 0
         for step in range(self.settings.total_steps):
@@ -108,6 +122,7 @@ class OffPolicyTrainer:
             self.replay.add(transition)
             self.algorithm.observe_transition(transition)
             episode_return += float(reward)
+            episode_length += 1
             if step + 1 > self.settings.warmup_steps and len(self.replay) >= self.settings.batch_size:
                 result = self.algorithm.update_from_batch(self.replay.sample(self.settings.batch_size))
                 if not isinstance(result, UpdateResult):
@@ -116,14 +131,40 @@ class OffPolicyTrainer:
                 metrics.extend(result.metrics)
             if terminated or truncated:
                 completed_returns.append(episode_return)
+                completed_lengths.append(episode_length)
+                metrics.extend(
+                    (
+                        MetricRecord("episode_return", episode_return, step + 1, "train"),
+                        MetricRecord("episode_length", float(episode_length), step + 1, "train"),
+                    )
+                )
                 episode_return = 0.0
+                episode_length = 0
                 if step + 1 < self.settings.total_steps:
                     observation, _ = seed_environment(self.environment, seed + len(completed_returns))
             else:
                 observation = next_observation
+            if (
+                self.evaluation_callback is not None
+                and self.settings.evaluation_frequency is not None
+                and (step + 1) % self.settings.evaluation_frequency == 0
+            ):
+                metrics.extend(self.evaluation_callback(step + 1, self.algorithm))
+        wall_time = perf_counter() - started
+        metrics.extend(
+            (
+                MetricRecord(
+                    "environment_steps", float(self.settings.total_steps), self.settings.total_steps, "train"
+                ),
+                MetricRecord("update_steps", float(gradient_updates), self.settings.total_steps, "train"),
+                MetricRecord("wall_time_seconds", wall_time, self.settings.total_steps, "train"),
+            )
+        )
         return TrainingSummary(
             environment_steps=self.settings.total_steps,
             gradient_updates=gradient_updates,
             completed_episode_returns=tuple(completed_returns),
+            completed_episode_lengths=tuple(completed_lengths),
+            wall_time_seconds=wall_time,
             metrics=tuple(metrics),
         )

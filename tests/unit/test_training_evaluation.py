@@ -122,6 +122,8 @@ def test_trainer_delegates_without_loss_logic() -> None:
         assert summary.environment_steps == 5
         assert summary.gradient_updates == 4
         assert len(summary.completed_episode_returns) == 2
+        assert summary.completed_episode_lengths == (2, 2)
+        assert summary.wall_time_seconds > 0
         assert len(algorithm.transitions) == 5
         assert len(algorithm.batches) == 4
         assert all(batch.batch_size == 2 for batch in algorithm.batches)
@@ -170,5 +172,34 @@ def test_planned_algorithm_cannot_enter_trainer() -> None:
             OffPolicyTrainer(
                 algorithm=algorithm, environment=environment, replay=_replay(), settings=_settings()
             )
+    finally:
+        environment.close()
+
+
+def test_trainer_runs_capability_agnostic_evaluation_callback() -> None:
+    algorithm = NoLearningOffPolicy()
+    environment = TinyContinuousEnv(horizon=2)
+    replay = _replay()
+    calls: list[int] = []
+
+    def callback(step: int, observed_algorithm: OffPolicyAlgorithm) -> tuple[MetricRecord, ...]:
+        assert observed_algorithm is algorithm
+        calls.append(step)
+        return (MetricRecord("scheduled_evaluation", float(step), step, "evaluation"),)
+
+    try:
+        trainer = OffPolicyTrainer(
+            algorithm=algorithm,
+            environment=environment,
+            replay=replay,
+            settings=TrainerSettings(5, 1, 2, True, True, evaluation_frequency=2),
+            evaluation_callback=callback,
+        )
+        summary = trainer.run(seed=7)
+        assert calls == [2, 4]
+        assert [metric.step for metric in summary.metrics if metric.name == "scheduled_evaluation"] == [
+            2,
+            4,
+        ]
     finally:
         environment.close()

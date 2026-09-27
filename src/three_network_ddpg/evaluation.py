@@ -60,7 +60,23 @@ def evaluate(
             lengths.append(length)
     finally:
         algorithm.set_evaluation_mode(False)
-    metrics = tuple(
-        MetricRecord("episode_return", value, index, "evaluation") for index, value in enumerate(returns)
+    metrics: list[MetricRecord] = []
+    for index, (episode_return, length) in enumerate(zip(returns, lengths, strict=True)):
+        metrics.extend(
+            (
+                MetricRecord("evaluation_episode_return", episode_return, index, "evaluation"),
+                MetricRecord("evaluation_episode_length", float(length), index, "evaluation"),
+            )
+        )
+    metrics.extend(
+        (
+            MetricRecord("evaluation_return_mean", float(np.mean(returns)), episodes, "evaluation"),
+            MetricRecord(
+                "evaluation_episode_length_mean",
+                float(np.mean(lengths)),
+                episodes,
+                "evaluation",
+            ),
+        )
     )
-    return EvaluationResult(tuple(returns), tuple(lengths), metrics)
+    return EvaluationResult(tuple(returns), tuple(lengths), tuple(metrics))

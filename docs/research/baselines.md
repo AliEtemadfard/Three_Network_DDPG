@@ -1,6 +1,6 @@
 # Baseline policy
 
-DDPG is the first implementation and verification gate. Standard DDPG with online and target actor/critic is the primary four-network comparison. DDPG without a target actor helps isolate that design change. TD3 is the next strong direct continuous-control baseline.
+DDPG is the first implementation and verification gate. The project-owned standard DDPG baseline now has online and target actor/critic networks, replay TD regression, deterministic policy gradients, collection-only Gaussian noise, and Polyak target updates. Focused tests verify its contracts; broader multi-seed empirical validation remains future work. Standard DDPG is the primary four-network comparison. DDPG without a target actor helps isolate that design change. TD3 is the next strong direct continuous-control baseline.
 
 SAC is a useful later continuous-control reference, but its stochastic policy and entropy objective change the assumptions. A2C and A3C are later on-policy contextual baselines, not architecturally equivalent to DDPG. A3C requires a separate multiprocessing design and must not be inserted as a trivial off-policy trainer variant.
 
