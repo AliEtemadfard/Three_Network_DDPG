@@ -1,6 +1,6 @@
 # Three Network DDPG
 
-**Status:** Research repository scaffold. The CLI inspects algorithm metadata and validates configuration; no training algorithm is implemented. The [original research specification](docs/research/source/Three_Network_DDPG_Research_Specification.docx) is preserved verbatim.
+**Status:** Executable research core with typed batches, replay, action utilities, environments, trainer shell, and evaluator. No named learning algorithm is implemented. The [original research specification](docs/research/source/Three_Network_DDPG_Research_Specification.docx) is preserved verbatim.
 
 DDPG uses a deterministic actor and a value critic, usually with slowly updated target copies of both networks. Target networks reduce movement in the bootstrap target but do not establish general convergence for nonlinear actor–critic learning. They also add parameter storage. This project asks whether one actor and two independently optimized critics can maintain a useful Bellman relation without target networks in the proposed main variant.
 
@@ -47,7 +47,7 @@ With an explicitly chosen bootstrap mask `m`, the shared residual is `δ = r + �
 
 ## Set up and commands that work now
 
-Use Python 3.11 and CPU by default. The environment file installs the editable package with development tools. PyTorch and Gymnasium are declared for later implementations; this scaffold does not create an environment or train an agent.
+Use Python 3.11 and CPU by default. The environment file installs the editable package with development tools. The smoke command exercises a seeded random policy without training an agent.
 
 ~~~bash
 conda env create -f environment.yml
@@ -57,6 +57,8 @@ three-network-ddpg --help
 three-network-ddpg algorithms
 three-network-ddpg config validate
 three-network-ddpg config show
+three-network-ddpg env-smoke --environment tiny_continuous --steps 6 --seed 2
+three-network-ddpg env-smoke --environment pendulum_v1 --steps 3 --seed 2
 python -m pytest
 ruff check .
 ruff format --check .
@@ -64,13 +66,15 @@ ruff format --check .
 
 For local TensorBoard or plotting support, install `.[tracking]` or `.[plotting]`. Weights & Biases remains optional under `.[wandb]`. No account or network service is required for default local tracking.
 
-**Planned, currently unavailable:** training, evaluation, replay collection, checkpointing, and plotting commands. The registry reports every algorithm as `planned`; it will never imply that a placeholder is trainable.
+**Available Python APIs:** `ReplayBuffer`, `OffPolicyTrainer`, `evaluate`, `make_environment`, action transforms, seed helpers, and `prepare_run_directory`. Tests use a no-learning algorithm test double. **Planned CLI commands:** learning, evaluation runs, checkpoint management, and plotting. Registry algorithms remain `planned` and cannot enter the trainer.
 
 ## Layout and extension points
 
 | Path | Purpose |
 | --- | --- |
-| `src/three_network_ddpg/core/` | Typed batches, algorithm interface, seed and metadata utilities |
+| `src/three_network_ddpg/core/` | Typed batches, action transforms, replay, interfaces, seeds, metadata |
+| `src/three_network_ddpg/environments.py` | Tiny deterministic fixture and Pendulum-v1 factory |
+| `src/three_network_ddpg/training.py`, `evaluation.py` | Off-policy trainer shell and separate noise-free evaluator |
 | `src/three_network_ddpg/algorithms/` | Metadata registry and explicit placeholders for DDPG, three-network, TD3, SAC, A2C, A3C |
 | `src/three_network_ddpg/conf/` | Composable algorithm, environment, experiment YAML |
 | `docs/research/` | Problem, notation, architecture, protocol, reproducibility, baseline policy, questions, decisions |
@@ -78,17 +82,17 @@ For local TensorBoard or plotting support, install `.[tracking]` or `.[plotting]
 | `data/`, `runs/`, `reports/` | Local inputs and generated outputs, ignored except guidance files |
 | `notebooks/`, `prompts/` | Exploration and reusable research prompts |
 
-To add an algorithm, first document its capability metadata and experimental role, add a configuration group, then implement the common interface without forcing on-policy rollouts through replay-buffer logic. Register a factory only after behavior and serialization tests pass. To add an environment, add an environment YAML group with ID, wrapper order, observation and reward treatment, action bounds policy, and a small environment smoke test. Keep training, evaluation, wrappers, tracking, and plotting separate.
+To add an algorithm, document its capability metadata and experimental role, add a config group, then implement `OffPolicyAlgorithm` or `OnPolicyAlgorithm`. Only the former enters `OffPolicyTrainer`; A3C needs its own multiprocessing design. Register a factory after behavior, gradient, and serialization tests pass. To add an environment, add a YAML group, extend the factory, and add a seeded smoke test. The factory currently rejects nonempty wrapper lists. Keep training, evaluation, wrappers, tracking, and plotting separate.
 
 ## Configurations and outputs
 
-`conf/config.yaml` selects one algorithm, environment, and experiment group. `config validate` composes them with OmegaConf and checks the required schema and cross-field constraints. The default proposed-method config is a **design placeholder**, not a selected scientific conclusion. It reserves alpha, alpha-prime, beta mode, schedule, state source, initialization, guarded-update controls, actor delay, and diagnostic frequency. DDPG and TD3 configs reserve their own target-network settings; the proposed main config has none. Device is `cpu` unless explicitly changed.
+`conf/config.yaml` selects one algorithm, environment, and experiment group. `config validate` composes them with OmegaConf and checks the required schema and cross-field constraints. The default proposed-method config is a **design placeholder**, not a selected scientific conclusion. It reserves alpha, alpha-prime, beta mode, schedule, state source, initialization, guarded-update controls, actor delay, and diagnostic frequency. DDPG and TD3 configs reserve their own target-network settings; the proposed main config has none. The experiment group explicitly chooses action clipping and whether truncations retain a bootstrap value. Device is `cpu` unless explicitly changed.
 
-When training exists, write each run under `runs/<experiment>/<algorithm>/<environment>/<timestamp>-seed-<seed>/`. Save the fully resolved config, seed, Git commit, package and environment versions, UTC start/end timestamps, CPU/GPU and OS metadata, raw per-step or per-episode CSV/JSONL, optional TensorBoard events, and checkpoints. Keep aggregates and figures under `reports/`, linked to raw run IDs. The metadata utility already creates the common JSON record; it does not start a run.
+`prepare_run_directory` creates `runs/<experiment>/<algorithm>/<environment>/<timestamp>-seed-<seed>/` and writes the resolved config, seed, Git commit, package versions, UTC start time, and CPU/GPU and OS metadata. It does not start training or write results. Future runs must add UTC end time, raw CSV/JSONL, optional TensorBoard events, checkpoints, and status. Keep aggregates and figures under `reports/`, linked to raw run IDs.
 
 ## Reproducibility and comparison policy
 
-Seed Python, NumPy, PyTorch, action spaces, and environments where supported. Record the actual seeds and deterministic backend settings; exact determinism is not guaranteed across devices or operations. Evaluation uses a separate seeded environment and **no exploration noise**. Record wrapper order, Gymnasium version and environment ID, Git commit hash, resolved configuration, package versions, hardware, timestamps, and failure or rejection counts. Retain every seed's raw results; aggregate only after all planned seeds, and report uncertainty and divergence rather than choosing successful runs.
+Seed Python, NumPy, PyTorch, action spaces, and environments where supported. Record the actual seeds and deterministic backend settings; exact determinism is not guaranteed across devices or operations. Call the evaluator with a separate seeded environment; it requests deterministic actions and rejects actions flagged as exploratory. Record wrapper order, Gymnasium version and environment ID, Git commit hash, resolved configuration, package versions, hardware, timestamps, and failure or rejection counts. Retain every seed's raw results; aggregate only after all planned seeds, and report uncertainty and divergence rather than choosing successful runs.
 
 DDPG and TD3 are the primary direct continuous-control comparisons. A2C and A3C are later on-policy contextual baselines, architecturally different from DDPG; A3C needs a separate multiprocessing design. SAC is a useful continuous-control reference but changes policy stochasticity and entropy assumptions. No external baseline code is vendored. Later paths are a clean tested implementation under the common interface or a thin adapter to a maintained library; copied or adapted code requires provenance and license review. See [baseline policy](docs/research/baselines.md).
 
