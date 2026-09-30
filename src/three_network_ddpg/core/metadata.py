@@ -12,6 +12,8 @@ from typing import Any
 
 from omegaconf import DictConfig, OmegaConf
 
+from .devices import resolve_device
+
 
 def _slug(value: str) -> str:
     if not re.fullmatch(r"[A-Za-z0-9_.-]+", value):
@@ -77,6 +79,8 @@ def build_run_metadata(
         "algorithm": resolved.algorithm.name,
         "environment_id": resolved.environment.id,
         "environment_wrappers": OmegaConf.to_container(resolved.environment.wrappers, resolve=True),
+        "requested_device": str(resolved.algorithm.device),
+        "resolved_device": resolve_device(str(resolved.algorithm.device)),
         "config": OmegaConf.to_container(resolved, resolve=True),
         "package_versions": packages,
         "hardware": _hardware_metadata(),

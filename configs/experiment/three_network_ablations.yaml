@@ -1,0 +1,30 @@
+# Public smoke example for controlled ablations. These are execution settings,
+# not tuned research defaults and not evidence-producing settings.
+algorithm: three_network_ddpg
+environment: pendulum_v1
+experiment: three_network_core
+overrides:
+  algorithm.device: cpu
+  algorithm.seed: 0
+  algorithm.hidden_layers: [64, 64]
+  algorithm.agreement_mode: both
+  algorithm.alpha: 0.1
+  algorithm.alpha_prime: 0.1
+  algorithm.beta_regularizer.mode: l2_y
+  algorithm.beta_regularizer.coefficient: 0.0001
+  algorithm.update_schedule: guarded
+  algorithm.guard.scope: joint
+  algorithm.guard.tolerance: 0.0
+  algorithm.guard.backtracking_factor: 0.5
+  algorithm.guard.maximum_retries: 3
+  algorithm.guard.minimum_learning_rate: 0.000001
+  algorithm.guard.validation_batch: true
+  algorithm.diagnostic_frequency: 25
+  experiment.total_steps: 256
+  experiment.warmup_steps: 32
+  experiment.batch_size: 32
+  experiment.replay_capacity: 1000
+  experiment.evaluation_frequency: 128
+  experiment.evaluation_episodes: 1
+  experiment.bootstrap_on_truncation: true
+  experiment.clip_actions: true

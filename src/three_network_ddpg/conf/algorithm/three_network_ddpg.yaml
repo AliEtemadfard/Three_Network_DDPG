@@ -1,16 +1,17 @@
 name: three_network_ddpg
-implementation_status: planned
+implementation_status: experimental
 is_on_policy: false
 uses_replay_buffer: true
 supports_continuous_actions: true
-# First planned prototype uses only shared error; agreement, beta and schedule are ablations.
+# Executable core and controlled agreement, beta, and schedule ablations.
 agreement_mode: none
 alpha: 0.0
 alpha_prime: 0.0
 beta_regularizer:
   mode: none
   coefficient: 0.0
-update_schedule: alternating
+update_schedule: sequential
 actor_state_source: next
 critic_initialization: independent
-# No target_networks key in the proposed main variant.
+actor_update_delay: 1
+# No target_networks key is permitted in the proposed main variant.
