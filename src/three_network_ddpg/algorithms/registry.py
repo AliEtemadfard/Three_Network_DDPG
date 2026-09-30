@@ -6,6 +6,7 @@ from ..core.interfaces import AlgorithmCapabilities
 
 ALGORITHMS: dict[str, AlgorithmCapabilities] = {
     "ddpg": AlgorithmCapabilities("ddpg", False, True, True, "verified"),
+    "ddpg_no_target_actor": AlgorithmCapabilities("ddpg_no_target_actor", False, True, True, "experimental"),
     "three_network_ddpg": AlgorithmCapabilities("three_network_ddpg", False, True, True, "experimental"),
     "td3": AlgorithmCapabilities("td3", False, True, True, "planned"),
     "sac": AlgorithmCapabilities("sac", False, True, True, "planned"),
@@ -31,6 +32,10 @@ def create_algorithm(name: str, **kwargs: Any) -> Any:
         from .ddpg import DDPG
 
         return DDPG.from_config(**kwargs)
+    if name == "ddpg_no_target_actor":
+        from .ddpg import DDPGNoTargetActor
+
+        return DDPGNoTargetActor.from_config(**kwargs)
     if name == "three_network_ddpg":
         from .three_network_ddpg import ThreeNetworkDDPG
 

@@ -12,3 +12,5 @@
 - Add controlled current and next critic agreement, experimental beta variants, same-snapshot simultaneous updates, recomputing sequential updates, scoped guarded backtracking with full optimizer restoration, independent validation monitoring, and interval-controlled critic and actor gradient diagnostics. These mechanisms remain experimental and establish no convergence claim.
 
 - Reject the undefined l2_y_z beta mode, honor DDPG exploration mode, centralize auto device resolution, enforce semantic checkpoint compatibility, and report guarded backtracking metrics for the last executed proposal.
+
+- Add the experimental `ddpg_no_target_actor` baseline with detached online-actor bootstrapping through a target critic, target-critic-only Polyak updates, distinct configuration and checkpoint identity, and deterministic and Pendulum smoke coverage. Stability remains unestablished pending multi-seed studies.

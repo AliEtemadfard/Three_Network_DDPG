@@ -164,6 +164,7 @@ class DDPG(OffPolicyAlgorithm):
     """Standard DDPG with online/target actor and critic networks."""
 
     capabilities = AlgorithmCapabilities("ddpg", False, True, True, "verified")
+    uses_target_actor = True
 
     def __init__(self, settings: DDPGSettings) -> None:
         self.settings = settings
@@ -171,9 +172,10 @@ class DDPG(OffPolicyAlgorithm):
         torch.manual_seed(settings.seed)
         self.actor = DeterministicActor(settings).to(self.device)
         self.critic = QCritic(settings).to(self.device)
-        self.target_actor = deepcopy(self.actor).to(self.device)
+        self.target_actor = deepcopy(self.actor).to(self.device) if self.uses_target_actor else None
         self.target_critic = deepcopy(self.critic).to(self.device)
-        self.target_actor.requires_grad_(False)
+        if self.target_actor is not None:
+            self.target_actor.requires_grad_(False)
         self.target_critic.requires_grad_(False)
         self.actor_optimizer = torch.optim.Adam(
             self.actor.parameters(),
@@ -209,6 +211,13 @@ class DDPG(OffPolicyAlgorithm):
         if noise_mode not in {"gaussian", "none"}:
             raise ValueError("DDPG exploration noise mode must be gaussian or none")
         target = algorithm_config["target_networks"]
+        expected_target_actor = cls.uses_target_actor
+        if bool(target["actor"]) != expected_target_actor or not bool(target["critic"]):
+            expected_actor = "true" if expected_target_actor else "false"
+            raise ValueError(
+                f"{cls.capabilities.name} requires target_networks.actor={expected_actor} "
+                "and target_networks.critic=true"
+            )
         optimizer = algorithm_config["optimizer"]
         gradient_clip = algorithm_config.get("gradient_clip_norm")
         settings = DDPGSettings(
@@ -259,6 +268,24 @@ class DDPG(OffPolicyAlgorithm):
     def observe_transition(self, transition: Transition) -> None:
         self._environment_steps += 1
 
+    def _critic_targets(self, batch: TransitionBatch) -> torch.Tensor:
+        """Build detached replay targets using this baseline's actor choice."""
+        with torch.no_grad():
+            bootstrap_actor = self.target_actor if self.target_actor is not None else self.actor
+            next_actions = bootstrap_actor(batch.next_observations).detach()
+            next_q = self.target_critic(batch.next_observations, next_actions).detach()
+            return ddpg_td_target(
+                batch.rewards,
+                batch.bootstrap_mask,
+                next_q,
+                self.settings.gamma,
+            )
+
+    def _soft_update_targets(self) -> None:
+        if self.target_actor is not None:
+            soft_update(self.target_actor, self.actor, self.settings.tau)
+        soft_update(self.target_critic, self.critic, self.settings.tau)
+
     def update_from_batch(
         self,
         batch: TransitionBatch,
@@ -268,10 +295,8 @@ class DDPG(OffPolicyAlgorithm):
         if validation_batch is not None:
             raise ValueError("DDPG does not consume a validation batch during updates")
         batch = batch.to(self.device)
-        with torch.no_grad():
-            next_actions = self.target_actor(batch.next_observations)
-            next_q = self.target_critic(batch.next_observations, next_actions)
-            targets = ddpg_td_target(batch.rewards, batch.bootstrap_mask, next_q, self.settings.gamma)
+        self.actor_optimizer.zero_grad(set_to_none=True)
+        targets = self._critic_targets(batch)
 
         self.critic_optimizer.zero_grad(set_to_none=True)
         predicted_q = self.critic(batch.observations, batch.actions)
@@ -299,8 +324,7 @@ class DDPG(OffPolicyAlgorithm):
         for parameter in critic_parameters:
             parameter.requires_grad_(True)
 
-        soft_update(self.target_actor, self.actor, self.settings.tau)
-        soft_update(self.target_critic, self.critic, self.settings.tau)
+        self._soft_update_targets()
         self._update_step += 1
         step = self._update_step
         values = {
@@ -323,15 +347,16 @@ class DDPG(OffPolicyAlgorithm):
         self._evaluation_mode = enabled
         self.actor.train(not enabled)
         self.critic.train(not enabled)
-        self.target_actor.eval()
+        if self.target_actor is not None:
+            self.target_actor.eval()
         self.target_critic.eval()
 
     def state_dict(self) -> Mapping[str, Any]:
-        return {
+        state: dict[str, Any] = {
+            "algorithm": self.capabilities.name,
             "settings": asdict(self.settings),
             "actor": self.actor.state_dict(),
             "critic": self.critic.state_dict(),
-            "target_actor": self.target_actor.state_dict(),
             "target_critic": self.target_critic.state_dict(),
             "actor_optimizer": self.actor_optimizer.state_dict(),
             "critic_optimizer": self.critic_optimizer.state_dict(),
@@ -339,12 +364,19 @@ class DDPG(OffPolicyAlgorithm):
             "environment_steps": self._environment_steps,
             "noise_rng_state": self._noise_rng.bit_generator.state,
         }
+        if self.target_actor is not None:
+            state["target_actor"] = self.target_actor.state_dict()
+        return state
 
     def load_state_dict(self, state: Mapping[str, Any]) -> None:
+        saved_algorithm = state.get("algorithm")
+        legacy_standard_ddpg = saved_algorithm is None and self.capabilities.name == "ddpg"
+        if not legacy_standard_ddpg and saved_algorithm != self.capabilities.name:
+            raise ValueError(f"checkpoint algorithm does not match {self.capabilities.name}")
         validate_checkpoint_settings(
             state.get("settings"),
             asdict(self.settings),
-            algorithm_name="DDPG",
+            algorithm_name=self.capabilities.name,
         )
         validate_adam_optimizer_state(
             state.get("actor_optimizer"),
@@ -362,7 +394,8 @@ class DDPG(OffPolicyAlgorithm):
         )
         self.actor.load_state_dict(state["actor"])
         self.critic.load_state_dict(state["critic"])
-        self.target_actor.load_state_dict(state["target_actor"])
+        if self.target_actor is not None:
+            self.target_actor.load_state_dict(state["target_actor"])
         self.target_critic.load_state_dict(state["target_critic"])
         self.actor_optimizer.load_state_dict(state["actor_optimizer"])
         self.critic_optimizer.load_state_dict(state["critic_optimizer"])
@@ -377,3 +410,10 @@ class DDPG(OffPolicyAlgorithm):
     def restore_checkpoint(self, path: Path) -> None:
         state = torch.load(path, map_location=self.device, weights_only=False)
         self.load_state_dict(state)
+
+
+class DDPGNoTargetActor(DDPG):
+    """DDPG ablation using the online actor and a target critic for bootstrapping."""
+
+    capabilities = AlgorithmCapabilities("ddpg_no_target_actor", False, True, True, "experimental")
+    uses_target_actor = False

@@ -127,6 +127,15 @@ def run_ddpg_experiment(config: DictConfig, *, repo_root: Path) -> Path:
     return _run_off_policy_experiment(config, repo_root=repo_root, expected_algorithm="ddpg")
 
 
+def run_ddpg_no_target_actor_experiment(config: DictConfig, *, repo_root: Path) -> Path:
+    """Train and evaluate the DDPG target-actor ablation once."""
+    return _run_off_policy_experiment(
+        config,
+        repo_root=repo_root,
+        expected_algorithm="ddpg_no_target_actor",
+    )
+
+
 def run_three_network_experiment(config: DictConfig, *, repo_root: Path) -> Path:
     """Train and evaluate the experimental three-network method once."""
     return _run_off_policy_experiment(config, repo_root=repo_root, expected_algorithm="three_network_ddpg")

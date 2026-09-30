@@ -18,6 +18,12 @@ ActionSelection carries an environment scale continuous action and an exploratio
 
 OffPolicyAlgorithm accepts transitions and replay batches. OnPolicyAlgorithm accepts rollout batches through separate methods. OffPolicyTrainer checks capabilities and refuses planned or on-policy algorithms; it owns environment interaction and update timing but no loss logic. An off-policy implementation can request an independent validation replay batch through the update contract. A3C remains outside this loop.
 
+## DDPG without a target actor
+
+`ddpg_no_target_actor` is a controlled DDPG baseline ablation and is not part of the proposed three-network method. It retains the online actor, online critic, and target critic, and has no target actor module. Its critic bootstrap is `r + gamma * bootstrap_mask * Q_target(s_next, actor_online(s_next))`. The next action and target value are detached during critic regression, so this phase cannot update the actor. The actor still maximizes the online critic on current states, and Polyak averaging updates only the target critic.
+
+The ablation uses the shared off-policy trainer, replay buffer, evaluator, action scaling, and DDPG network components. Its registry name, resolved config, run metadata, and checkpoint identity are `ddpg_no_target_actor`. This executable contract and smoke coverage establish implementation behavior only; stability and return require controlled multi-seed comparisons.
+
 ## Three-network update schedules
 
 sequential applies Critic Two, recomputes the needed outputs, applies Critic One, then applies the actor. The later phases intentionally see earlier parameter changes.

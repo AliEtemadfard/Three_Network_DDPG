@@ -1,6 +1,6 @@
 # Three Network DDPG
 
-**Status:** The standard four-network DDPG baseline is verified by focused CPU tests. The proposed target-free three-network method now has an experimental executable core with controlled agreement, beta, simultaneous, sequential, and guarded ablations. TD3, SAC, A2C, and A3C remain unimplemented. The [original research specification](docs/research/source/Three_Network_DDPG_Research_Specification.docx) is preserved verbatim.
+**Status:** The standard four-network DDPG baseline and the controlled `ddpg_no_target_actor` ablation are verified by focused CPU tests. The proposed target-free three-network method now has an experimental executable core with controlled agreement, beta, simultaneous, sequential, and guarded ablations. TD3, SAC, A2C, and A3C remain unimplemented. The [original research specification](docs/research/source/Three_Network_DDPG_Research_Specification.docx) is preserved verbatim.
 
 DDPG uses a deterministic actor and a value critic, usually with slowly updated target copies of both networks. Target networks reduce movement in the bootstrap target but do not establish general convergence for nonlinear actor–critic learning. They also add parameter storage. This project asks whether one actor and two independently optimized critics can maintain a useful Bellman relation without target networks in the proposed main variant.
 
@@ -42,16 +42,17 @@ The proposed implementation uses one actor and two independently initialized cri
 ## Roadmap
 
 1. Maintain and empirically validate the implemented standard DDPG baseline on Pendulum and later tasks.
-2. Maintain and empirically validate the implemented shared-error reference and its verified gradient paths.
-3. Evaluate the implemented no, current, next, and both critic-agreement modes.
-4. Evaluate the implemented beta and schedule ablations; actor state source, initialization, and actor delay remain separate research axes.
-5. Run fair multi-seed studies and failure analysis.
-6. Refine a local descent theory for the selected implementation and its actual assumptions.
-7. Review novelty against target-free, residual-gradient, and twin-critic literature before framing a contribution.
+2. Compare the implemented `ddpg_no_target_actor` ablation while holding all other DDPG settings fixed; do not infer stability from smoke runs.
+3. Maintain and empirically validate the implemented shared-error reference and its verified gradient paths.
+4. Evaluate the implemented no, current, next, and both critic-agreement modes.
+5. Evaluate the implemented beta and schedule ablations; actor state source, initialization, and actor delay remain separate research axes.
+6. Run fair multi-seed studies and failure analysis.
+7. Refine a local descent theory for the selected implementation and its actual assumptions.
+8. Review novelty against target-free, residual-gradient, and twin-critic literature before framing a contribution.
 
 ## Set up and commands that work now
 
-Use Python 3.11 and CPU by default. The environment file installs the editable package with development tools. The environment smoke command exercises a seeded random policy. The DDPG and three-network commands perform short local learning runs and record artifacts; their default budgets are for execution checks, not scientific comparison.
+Use Python 3.11 and CPU by default. The environment file installs the editable package with development tools. The environment smoke command exercises a seeded random policy. The DDPG, no-target-actor DDPG, and three-network commands perform short local learning runs and record artifacts; their default budgets are for execution checks, not scientific comparison.
 
 ~~~bash
 conda env create -f environment.yml
@@ -64,6 +65,7 @@ three-network-ddpg config show
 three-network-ddpg env-smoke --environment tiny_continuous --steps 6 --seed 2
 three-network-ddpg env-smoke --environment pendulum_v1 --steps 3 --seed 2
 three-network-ddpg train-ddpg --environment pendulum_v1 --experiment ddpg_baseline
+three-network-ddpg train-ddpg-no-target-actor --environment pendulum_v1 --experiment ddpg_no_target_actor
 three-network-ddpg train-three-network --environment pendulum_v1 --experiment three_network_core
 three-network-ddpg train-three-network --environment tiny_continuous --experiment three_network_core \
   --set experiment.total_steps=24 --set experiment.warmup_steps=4 \
@@ -80,7 +82,7 @@ ruff format --check .
 
 For local TensorBoard or plotting support, install `.[tracking]` or `.[plotting]`. Weights & Biases remains optional under `.[wandb]`. No account or network service is required for default local tracking.
 
-**Available:** `DDPG`, experimental `ThreeNetworkDDPG`, `ReplayBuffer`, `OffPolicyTrainer`, `evaluate`, `make_environment`, action transforms, seed helpers, and `prepare_run_directory`. Both training commands write resolved configuration, metadata, JSONL metrics, a summary, and a checkpoint. TD3, SAC, A2C, and A3C remain `planned` and cannot enter the trainer. Plotting and general checkpoint-management commands are planned.
+**Available:** `DDPG`, experimental `DDPGNoTargetActor`, experimental `ThreeNetworkDDPG`, `ReplayBuffer`, `OffPolicyTrainer`, `evaluate`, `make_environment`, action transforms, seed helpers, and `prepare_run_directory`. All three training commands write resolved configuration, metadata, JSONL metrics, a summary, and a checkpoint. TD3, SAC, A2C, and A3C remain `planned` and cannot enter the trainer. Plotting and general checkpoint-management commands are planned.
 
 ## Layout and extension points
 
@@ -89,7 +91,7 @@ For local TensorBoard or plotting support, install `.[tracking]` or `.[plotting]
 | `src/three_network_ddpg/core/` | Typed batches, action transforms, replay, interfaces, seeds, metadata |
 | `src/three_network_ddpg/environments.py` | Tiny deterministic fixture and Pendulum-v1 factory |
 | `src/three_network_ddpg/training.py`, `evaluation.py` | Off-policy trainer shell and separate noise-free evaluator |
-| `src/three_network_ddpg/algorithms/` | Metadata registry and implemented DDPG and three-network modules plus explicit TD3, SAC, A2C, and A3C placeholders |
+| `src/three_network_ddpg/algorithms/` | Metadata registry and implemented DDPG variants and three-network modules plus explicit TD3, SAC, A2C, and A3C placeholders |
 | `src/three_network_ddpg/conf/` | Composable algorithm, environment, experiment YAML |
 | `docs/research/` | Problem, notation, architecture, protocol, reproducibility, baseline policy, questions, decisions |
 | `tests/` | Fast scaffold checks; later gradient and integration tests |
@@ -100,7 +102,7 @@ To add an algorithm, document its capability metadata and experimental role, add
 
 ## Configurations and outputs
 
-The packaged YAML groups compose with OmegaConf and validate cross-field constraints. The proposed method supports explicit agreement and beta modes, sequential, simultaneous, and guarded schedules, current or next actor input, guard scope and backtracking settings, optional validation-batch monitoring, and interval-controlled gradient diagnostics. It still rejects target networks, identical critic initialization, and delayed actor updates. DDPG and TD3 reserve their own target-network settings. Device is cpu unless explicitly changed. The user-facing auto option resolves once to cpu or cuda at runtime; run metadata records both the requested and resolved values. DDPG collection supports gaussian or none exploration modes, and evaluation is always noise-free.
+The packaged YAML groups compose with OmegaConf and validate cross-field constraints. The proposed method supports explicit agreement and beta modes, sequential, simultaneous, and guarded schedules, current or next actor input, guard scope and backtracking settings, optional validation-batch monitoring, and interval-controlled gradient diagnostics. It still rejects target networks, identical critic initialization, and delayed actor updates. `ddpg_no_target_actor` requires `target_networks.actor=false` and `target_networks.critic=true`; standard DDPG and TD3 retain both targets. Device is cpu unless explicitly changed. The user-facing auto option resolves once to cpu or cuda at runtime; run metadata records both the requested and resolved values. Both DDPG baselines support gaussian or none collection exploration modes, and evaluation is always noise-free.
 
 Each training command creates `runs/<experiment>/<algorithm>/<environment>/<timestamp>-seed-<seed>/` and writes the resolved config, requested and resolved device, seed, Git commit, package versions, UTC start time, CPU/GPU and OS metadata, JSONL metrics, summary, and checkpoint. The summary marks a single smoke run as non-evidentiary. Future study tooling must add final status and multi-seed aggregation. Keep aggregates and figures under `reports/`, linked to raw run IDs.
 

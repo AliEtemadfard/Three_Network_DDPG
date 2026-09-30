@@ -2,6 +2,7 @@
 
 from .implementation import (
     DDPG,
+    DDPGNoTargetActor,
     DDPGSettings,
     DeterministicActor,
     QCritic,
@@ -13,6 +14,7 @@ from .implementation import (
 __all__ = [
     "DDPG",
     "DDPGSettings",
+    "DDPGNoTargetActor",
     "DeterministicActor",
     "QCritic",
     "build_mlp",

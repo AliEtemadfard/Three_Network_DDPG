@@ -110,20 +110,24 @@ def validate_config(config: DictConfig) -> None:
             errors.append("minimal three-network core requires action rescaling")
         if algorithm.exploration_noise.mode not in {"gaussian", "none"}:
             errors.append("minimal three-network core supports gaussian or disabled exploration")
-    if algorithm.name in {"ddpg", "td3"}:
+    if algorithm.name in {"ddpg", "ddpg_no_target_actor", "td3"}:
         if "target_networks" not in algorithm:
-            errors.append("DDPG and TD3 require explicit target-network settings")
-        elif not (algorithm.target_networks.actor and algorithm.target_networks.critic):
-            errors.append("DDPG and TD3 target actor and critic must be enabled")
-        elif not _number(algorithm.target_networks.tau, positive=True) or (algorithm.target_networks.tau > 1):
-            errors.append("target-network tau must be in (0, 1]")
-    if algorithm.name == "ddpg":
+            errors.append("DDPG-family and TD3 configs require explicit target-network settings")
+        else:
+            targets = algorithm.target_networks
+            if algorithm.name in {"ddpg", "td3"} and not (targets.actor and targets.critic):
+                errors.append("standard DDPG and TD3 target actor and critic must be enabled")
+            if algorithm.name == "ddpg_no_target_actor" and (targets.actor or not targets.critic):
+                errors.append("ddpg_no_target_actor requires actor=false and critic=true")
+            if not _number(targets.tau, positive=True) or targets.tau > 1:
+                errors.append("target-network tau must be in (0, 1]")
+    if algorithm.name in {"ddpg", "ddpg_no_target_actor"}:
         if algorithm.optimizer.name != "adam":
-            errors.append("verified DDPG currently supports the Adam optimizer")
+            errors.append("DDPG baselines currently support the Adam optimizer")
         if not algorithm.action_rescaling:
-            errors.append("verified DDPG requires action rescaling")
+            errors.append("DDPG baselines require action rescaling")
         if algorithm.actor_update_delay != 1:
-            errors.append("standard DDPG updates its actor every update")
+            errors.append("DDPG baselines update the actor every update")
         if algorithm.exploration_noise.mode not in {"gaussian", "none"}:
             errors.append("DDPG exploration noise mode must be gaussian or none")
         noise_clip = algorithm.exploration_noise.clip

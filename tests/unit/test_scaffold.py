@@ -54,7 +54,7 @@ def test_registry_metadata_and_composition(name: str) -> None:
     assert config.algorithm.is_on_policy == capabilities.is_on_policy
     if name == "ddpg":
         assert capabilities.implementation_status == "verified"
-    elif name == "three_network_ddpg":
+    elif name in {"ddpg_no_target_actor", "three_network_ddpg"}:
         assert capabilities.implementation_status == "experimental"
     else:
         assert capabilities.implementation_status == "planned"
@@ -114,6 +114,7 @@ def test_cli_help_and_inspection(capsys: pytest.CaptureFixture[str]) -> None:
     output = capsys.readouterr().out
     assert "a3c\tplanned\ton-policy" in output
     assert "three_network_ddpg\texperimental\toff-policy" in output
+    assert "ddpg_no_target_actor\texperimental\toff-policy" in output
     assert main(["config", "validate"]) == 0
     assert "Configuration valid" in capsys.readouterr().out
 
