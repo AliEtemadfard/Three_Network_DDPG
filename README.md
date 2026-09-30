@@ -45,22 +45,38 @@ With an explicitly chosen bootstrap mask `m`, the shared residual is `Î´ = r + Î
 6. Refine a local descent theory for the selected implementation and its actual assumptions.
 7. Review novelty against target-free, residual-gradient, and twin-critic literature before framing a contribution.
 
-## Set up and commands that work now
+## Canonical environment and verified commands
 
-Use Python 3.11 and CPU by default. The environment file installs the editable package with development tools. PyTorch and Gymnasium are declared for later implementations; this scaffold does not create an environment or train an agent.
+Python 3.11 is the canonical runtime for development and the first scientific runs. The portable Conda specification installs the editable package, PyTorch, Gymnasium, NumPy, pytest, and Ruff. Python 3.12 remains a CI compatibility target. Exact resolved versions belong in run metadata rather than a platform-specific environment export.
+
+Create the environment once:
 
 ~~~bash
-conda env create -f environment.yml
+conda env create --file environment.yml
 conda activate three-network-ddpg
-python -m pip install -e ".[dev]"
+~~~
+
+Update an existing environment after dependency changes:
+
+~~~bash
+conda env update --name three-network-ddpg --file environment.yml --prune
+conda activate three-network-ddpg
+~~~
+
+Run the same verification commands used by the canonical CI job:
+
+~~~bash
+python scripts/environment_smoke.py
+ruff check .
+ruff format --check .
+python -m pytest
 three-network-ddpg --help
 three-network-ddpg algorithms
 three-network-ddpg config validate
 three-network-ddpg config show
-python -m pytest
-ruff check .
-ruff format --check .
 ~~~
+
+The smoke script performs a CPU PyTorch tensor operation and one seeded `Pendulum-v1` transition, then prints the exact Python, PyTorch, Gymnasium, NumPy, and platform versions. It does not train an algorithm or produce scientific evidence.
 
 For local TensorBoard or plotting support, install `.[tracking]` or `.[plotting]`. Weights & Biases remains optional under `.[wandb]`. No account or network service is required for default local tracking.
 
@@ -84,7 +100,7 @@ To add an algorithm, first document its capability metadata and experimental rol
 
 `conf/config.yaml` selects one algorithm, environment, and experiment group. `config validate` composes them with OmegaConf and checks the required schema and cross-field constraints. The default proposed-method config is a **design placeholder**, not a selected scientific conclusion. It reserves alpha, alpha-prime, beta mode, schedule, state source, initialization, guarded-update controls, actor delay, and diagnostic frequency. DDPG and TD3 configs reserve their own target-network settings; the proposed main config has none. Device is `cpu` unless explicitly changed.
 
-When training exists, write each run under `runs/<experiment>/<algorithm>/<environment>/<timestamp>-seed-<seed>/`. Save the fully resolved config, seed, Git commit, package and environment versions, UTC start/end timestamps, CPU/GPU and OS metadata, raw per-step or per-episode CSV/JSONL, optional TensorBoard events, and checkpoints. Keep aggregates and figures under `reports/`, linked to raw run IDs. The metadata utility already creates the common JSON record; it does not start a run.
+When training exists, write each run under `runs/<experiment>/<algorithm>/<environment>/<timestamp>-seed-<seed>/`. Save the fully resolved config, seed, Git commit, exact Python/PyTorch/Gymnasium/NumPy versions, UTC start/end timestamps, CPU/GPU and OS metadata, raw per-step or per-episode CSV/JSONL, optional TensorBoard events, and checkpoints. Keep aggregates and figures under `reports/`, linked to raw run IDs. The metadata utility already creates the common JSON record; it does not start a run.
 
 ## Reproducibility and comparison policy
 

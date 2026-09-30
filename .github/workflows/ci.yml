@@ -2,16 +2,37 @@ name: CPU checks
 on:
   push:
   pull_request:
+
 jobs:
-  checks:
+  canonical-python-311:
+    name: Canonical Conda (Python 3.11)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          activate-environment: three-network-ddpg
+          environment-file: environment.yml
+          auto-activate-base: false
+      - run: python scripts/environment_smoke.py
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: python -m pytest
+
+  python-312-compatibility:
+    name: Python 3.12 compatibility
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.12"
           cache: pip
-      - run: python -m pip install -e '.[dev]'
+      - run: python -m pip install -e ".[dev]"
+      - run: python scripts/environment_smoke.py
       - run: ruff check .
       - run: ruff format --check .
       - run: python -m pytest

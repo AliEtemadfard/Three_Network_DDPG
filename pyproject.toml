@@ -13,6 +13,7 @@ classifiers = ["Programming Language :: Python :: 3", "Development Status :: 2 -
 dependencies = [
   "torch>=2.2",
   "gymnasium>=0.29",
+  "numpy>=1.26,<3",
   "omegaconf>=2.3,<3",
 ]
 
@@ -33,7 +34,7 @@ three_network_ddpg = ["conf/**/*.yaml", "conf/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q --basetemp=.test_tmp"
 
 [tool.ruff]
 line-length = 110

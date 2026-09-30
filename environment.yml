@@ -1,8 +1,10 @@
 name: three-network-ddpg
 channels:
   - conda-forge
+  - nodefaults
 dependencies:
+  # Python 3.11 is the canonical runtime for experiments and the primary CI job.
   - python=3.11
-  - pip
+  - pip>=24
   - pip:
       - -e .[dev]

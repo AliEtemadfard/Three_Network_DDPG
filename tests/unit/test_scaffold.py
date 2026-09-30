@@ -1,5 +1,8 @@
 """Fast tests for metadata-only repository behavior."""
 
+import importlib.metadata
+import json
+import platform
 import random
 
 import pytest
@@ -72,6 +75,8 @@ def test_seed_utility_repeats_python_sequence() -> None:
     seed_everything(17)
     assert random.random() == first
     assert report.seed == 17
+    assert report.numpy_seeded
+    assert report.torch_seeded
     with pytest.raises(ValueError, match="non-negative"):
         seed_everything(-1)
 
@@ -102,5 +107,11 @@ def test_run_metadata_contains_resolved_config(tmp_path) -> None:
     assert (directory / "metadata.json").exists()
     assert (directory / "resolved_config.yaml").exists()
     resolved = OmegaConf.load(directory / "resolved_config.yaml")
+    metadata = json.loads((directory / "metadata.json").read_text(encoding="utf-8"))
     assert resolved.algorithm.name == "three_network_ddpg"
     assert resolved.algorithm.seed == 5
+    assert metadata["python_version"] == platform.python_version()
+    assert metadata["python_implementation"] == platform.python_implementation()
+    assert metadata["platform"] == platform.platform()
+    for distribution in ("torch", "gymnasium", "numpy"):
+        assert metadata["package_versions"][distribution] == importlib.metadata.version(distribution)
