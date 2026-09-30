@@ -14,6 +14,8 @@ from torch.optim import Optimizer
 
 from ...core.actions import clip_action, scale_action_tensor
 from ...core.batches import Transition, TransitionBatch
+from ...core.checkpoints import validate_adam_optimizer_state, validate_checkpoint_settings
+from ...core.devices import resolve_device
 from ...core.interfaces import (
     ActionSelection,
     AlgorithmCapabilities,
@@ -23,7 +25,7 @@ from ...core.interfaces import (
 )
 
 AgreementMode = Literal["none", "current", "next", "both"]
-BetaMode = Literal["none", "linear_y", "l2_y", "l2_y_z"]
+BetaMode = Literal["none", "linear_y", "l2_y"]
 UpdateSchedule = Literal["sequential", "simultaneous", "guarded"]
 GuardScope = Literal["joint", "critics", "actor"]
 ActorStateSource = Literal["current", "next"]
@@ -95,7 +97,9 @@ class ThreeNetworkSettings:
             raise ValueError("current agreement does not use alpha")
         if self.agreement_mode == "next" and self.alpha_prime != 0:
             raise ValueError("next agreement does not use alpha_prime")
-        if self.beta_mode not in {"none", "linear_y", "l2_y", "l2_y_z"}:
+        if self.beta_mode == "l2_y_z":
+            raise ValueError("l2_y_z is unavailable because symmetric Y/Z regularization is not defined")
+        if self.beta_mode not in {"none", "linear_y", "l2_y"}:
             raise ValueError("unsupported beta_mode")
         if self.beta_coefficient < 0:
             raise ValueError("beta_coefficient must be nonnegative")
@@ -188,7 +192,7 @@ class ThreeNetworkSettings:
             exploration_noise_clip=None if noise["clip"] is None else float(noise["clip"]),
             gradient_clip_norm=None if gradient_clip is None else float(gradient_clip),
             diagnostic_frequency=(None if diagnostic_frequency is None else int(diagnostic_frequency)),
-            device=str(algorithm_config["device"]),
+            device=resolve_device(str(algorithm_config["device"])),
             seed=int(algorithm_config["seed"]),
         )
 
@@ -287,8 +291,6 @@ def beta_regularizer(mode: BetaMode, y: torch.Tensor, z: torch.Tensor) -> torch.
         return y.mean()
     if mode == "l2_y":
         return 0.5 * y.square().mean()
-    if mode == "l2_y_z":
-        return 0.5 * (y.square() + z.square()).mean()
     raise ValueError(f"unsupported beta mode: {mode}")
 
 
@@ -324,6 +326,7 @@ class _GuardOutcome:
     critic_two: _PhaseResult | None
     actor: _PhaseResult | None
     update_applied: bool
+    termination_reason: Literal["accepted", "retries_exhausted", "minimum_learning_rate"]
 
 
 def _gradient_norm(gradients: Sequence[torch.Tensor]) -> float:
@@ -728,9 +731,12 @@ class ThreeNetworkDDPG(OffPolicyAlgorithm):
         accepted = False
         retries = 0
         effective_lr = min(rate for group in base_lrs for rate in group)
-        scale = 1.0
+        last_attempted_scale = 1.0
         error_after = error_before
         validation_change: float | None = None
+        termination_reason: Literal["accepted", "retries_exhausted", "minimum_learning_rate"] = (
+            "retries_exhausted"
+        )
         phase_results: tuple[_PhaseResult | None, _PhaseResult | None, _PhaseResult | None] = (
             None,
             None,
@@ -738,21 +744,23 @@ class ThreeNetworkDDPG(OffPolicyAlgorithm):
         )
 
         for retry in range(self.settings.guard_maximum_retries + 1):
-            scale = self.settings.guard_backtracking_factor**retry
-            candidate_lr = min(rate * scale for group in base_lrs for rate in group)
+            candidate_scale = self.settings.guard_backtracking_factor**retry
+            candidate_lr = min(rate * candidate_scale for group in base_lrs for rate in group)
             if candidate_lr < self.settings.guard_minimum_learning_rate:
+                termination_reason = "minimum_learning_rate"
                 break
             self._restore_training_state(state)
-            effective_lr = self._set_scaled_lrs(optimizers, base_lrs, scale)
+            last_attempted_scale = candidate_scale
+            effective_lr = self._set_scaled_lrs(optimizers, base_lrs, last_attempted_scale)
             phase_results = self._guard_proposal(scope, batch)
             error_after = self._shared_error_value(batch)
+            retries = retry
             if validation_batch is not None and validation_before is not None:
                 validation_change = self._shared_error_value(validation_batch) - validation_before
             if error_after <= error_before + self.settings.guard_tolerance:
                 accepted = True
-                retries = retry
+                termination_reason = "accepted"
                 break
-            retries = retry
 
         if accepted:
             # The accepted proposal used the reported effective rate. Restore the
@@ -769,7 +777,7 @@ class ThreeNetworkDDPG(OffPolicyAlgorithm):
             accepted=accepted,
             retries=retries,
             effective_learning_rate=effective_lr,
-            learning_rate_scale=scale,
+            learning_rate_scale=last_attempted_scale,
             error_before=error_before,
             error_after=error_after,
             committed_error_after=committed_error_after,
@@ -778,6 +786,7 @@ class ThreeNetworkDDPG(OffPolicyAlgorithm):
             critic_two=phase_results[1],
             actor=phase_results[2],
             update_applied=accepted,
+            termination_reason=termination_reason,
         )
 
     def _guarded_update(
@@ -1003,13 +1012,17 @@ class ThreeNetworkDDPG(OffPolicyAlgorithm):
                     "guard_error_before": guard_outcome.error_before,
                     "guard_error_after": guard_outcome.error_after,
                     "guard_committed_error_after": guard_outcome.committed_error_after,
+                    "guard_stopped_at_minimum_learning_rate": float(
+                        guard_outcome.termination_reason == "minimum_learning_rate"
+                    ),
+                    "guard_retries_exhausted": float(guard_outcome.termination_reason == "retries_exhausted"),
                 }
             )
             if guard_outcome.validation_change is not None:
                 values["guard_validation_error_change"] = guard_outcome.validation_change
         values.update(diagnostic_values)
         skipped_reason = (
-            "guard rejected joint proposal"
+            f"guard rejected joint proposal: {guard_outcome.termination_reason}"
             if guard_outcome is not None and not guard_outcome.update_applied
             else None
         )
@@ -1042,8 +1055,32 @@ class ThreeNetworkDDPG(OffPolicyAlgorithm):
         }
 
     def load_state_dict(self, state: Mapping[str, Any]) -> None:
-        if state.get("settings") != self.settings.to_dict():
-            raise ValueError("checkpoint settings do not match this three-network instance")
+        validate_checkpoint_settings(
+            state.get("settings"),
+            self.settings.to_dict(),
+            algorithm_name="three-network",
+        )
+        validate_adam_optimizer_state(
+            state.get("actor_optimizer"),
+            learning_rate=self.settings.actor_learning_rate,
+            epsilon=self.settings.optimizer_epsilon,
+            weight_decay=self.settings.weight_decay,
+            optimizer_name="three-network actor optimizer",
+        )
+        validate_adam_optimizer_state(
+            state.get("critic_one_optimizer"),
+            learning_rate=self.settings.critic_one_learning_rate,
+            epsilon=self.settings.optimizer_epsilon,
+            weight_decay=self.settings.weight_decay,
+            optimizer_name="three-network Critic One optimizer",
+        )
+        validate_adam_optimizer_state(
+            state.get("critic_two_optimizer"),
+            learning_rate=self.settings.critic_two_learning_rate,
+            epsilon=self.settings.optimizer_epsilon,
+            weight_decay=self.settings.weight_decay,
+            optimizer_name="three-network Critic Two optimizer",
+        )
         forbidden = {"target_actor", "target_critic"} & set(state)
         if forbidden:
             raise ValueError("target-network state is forbidden in the proposed variant")

@@ -12,6 +12,8 @@ from torch import nn
 
 from ...core.actions import clip_action, scale_action_tensor
 from ...core.batches import Transition, TransitionBatch
+from ...core.checkpoints import validate_adam_optimizer_state, validate_checkpoint_settings
+from ...core.devices import resolve_device
 from ...core.interfaces import (
     ActionSelection,
     AlgorithmCapabilities,
@@ -203,6 +205,9 @@ class DDPG(OffPolicyAlgorithm):
     ) -> "DDPG":
         hidden = tuple(int(width) for width in algorithm_config["hidden_layers"])
         noise = algorithm_config["exploration_noise"]
+        noise_mode = str(noise["mode"])
+        if noise_mode not in {"gaussian", "none"}:
+            raise ValueError("DDPG exploration noise mode must be gaussian or none")
         target = algorithm_config["target_networks"]
         optimizer = algorithm_config["optimizer"]
         gradient_clip = algorithm_config.get("gradient_clip_norm")
@@ -219,10 +224,10 @@ class DDPG(OffPolicyAlgorithm):
             optimizer_epsilon=float(optimizer["epsilon"]),
             weight_decay=float(optimizer["weight_decay"]),
             tau=float(target["tau"]),
-            exploration_noise_std=float(noise["standard_deviation"]),
+            exploration_noise_std=(0.0 if noise_mode == "none" else float(noise["standard_deviation"])),
             exploration_noise_clip=(None if noise["clip"] is None else float(noise["clip"])),
             gradient_clip_norm=None if gradient_clip is None else float(gradient_clip),
-            device=str(algorithm_config["device"]),
+            device=resolve_device(str(algorithm_config["device"])),
             seed=int(algorithm_config["seed"]),
         )
         return cls(settings)
@@ -336,6 +341,25 @@ class DDPG(OffPolicyAlgorithm):
         }
 
     def load_state_dict(self, state: Mapping[str, Any]) -> None:
+        validate_checkpoint_settings(
+            state.get("settings"),
+            asdict(self.settings),
+            algorithm_name="DDPG",
+        )
+        validate_adam_optimizer_state(
+            state.get("actor_optimizer"),
+            learning_rate=self.settings.actor_learning_rate,
+            epsilon=self.settings.optimizer_epsilon,
+            weight_decay=self.settings.weight_decay,
+            optimizer_name="DDPG actor optimizer",
+        )
+        validate_adam_optimizer_state(
+            state.get("critic_optimizer"),
+            learning_rate=self.settings.critic_learning_rate,
+            epsilon=self.settings.optimizer_epsilon,
+            weight_decay=self.settings.weight_decay,
+            optimizer_name="DDPG critic optimizer",
+        )
         self.actor.load_state_dict(state["actor"])
         self.critic.load_state_dict(state["critic"])
         self.target_actor.load_state_dict(state["target_actor"])

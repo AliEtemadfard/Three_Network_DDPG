@@ -1,5 +1,6 @@
 """Fast checks retained from the bootstrap scaffold."""
 
+import json
 import random
 
 import pytest
@@ -15,6 +16,7 @@ from three_network_ddpg.algorithms.registry import (
 from three_network_ddpg.cli import main
 from three_network_ddpg.config import load_config, validate_config
 from three_network_ddpg.core.batches import RolloutBatch, TransitionBatch
+from three_network_ddpg.core.devices import resolve_device
 from three_network_ddpg.core.metadata import prepare_run_directory
 from three_network_ddpg.core.seeds import seed_environment, seed_everything
 
@@ -146,11 +148,25 @@ def test_environment_seeding() -> None:
     assert environment.action_space.received == 3
 
 
-def test_run_metadata_contains_resolved_config(tmp_path) -> None:
-    config = load_config()
+def test_run_metadata_contains_resolved_config(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    config = load_config(overrides=["algorithm.device=auto"])
     directory = prepare_run_directory(tmp_path, config, seed=5, repo_root=tmp_path)
     assert (directory / "metadata.json").exists()
     assert (directory / "resolved_config.yaml").exists()
     resolved = OmegaConf.load(directory / "resolved_config.yaml")
+    metadata = json.loads((directory / "metadata.json").read_text())
     assert resolved.algorithm.name == "three_network_ddpg"
     assert resolved.algorithm.seed == 5
+    assert metadata["requested_device"] == "auto"
+    assert metadata["resolved_device"] == "cpu"
+
+
+def test_auto_device_resolves_to_cpu_without_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    assert resolve_device("auto") == "cpu"
+
+
+def test_auto_device_resolves_to_cuda_when_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    assert resolve_device("auto") == "cuda"

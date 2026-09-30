@@ -33,11 +33,11 @@ For a batch of transitions `(s, a, r, s', terminated, truncated)`, `μθ` is the
 
 With an explicitly chosen bootstrap mask `m`, the shared residual is `δ = r + γ m Z − Y` and its diagnostic error is `e = ½ mean(δ²)`. Current agreement error is `½ mean((Z1 − Y)²)`; next agreement error is `½ mean((Y1 − Z)²)`. `m` must handle termination and truncation deliberately; see [notation](docs/research/notation.md). The board derivation omitted terminal masking, so implementation must add it. The actor maximizes Critic Two on next states in the initial interpretation, with current states reserved as an ablation.
 
-**Warning:** The original linear beta term can drive negative `Y` values downward and does not bound their magnitude. Linear and quadratic variants are research alternatives. The final objective and convergence statement remain unresolved; see [open questions](docs/research/open_questions.md).
+**Warning:** The original linear beta term can drive negative `Y` values downward and does not bound their magnitude. Linear and quadratic variants are research alternatives. The unavailable l2_y_z mode is rejected because symmetric Z regularization needs an advisor-approved, separately named objective. The final objective and convergence statement remain unresolved; see [open questions](docs/research/open_questions.md).
 
 ### Executable controlled variant
 
-The proposed implementation uses one actor and two independently initialized critics with no target modules. The shared-error-only setting remains the reference. Agreement modes none, current, next, and both; beta modes none, experimental linear_y, l2_y, and l2_y_z; and schedules sequential, simultaneous, and guarded are executable. A guard can cover the joint update, critics, or actor, and can monitor a separate replay batch. Next-state actor input remains the reconstructed default. See [three-network controlled implementation](docs/research/three_network_core.md) for formulas, detach rules, and limits.
+The proposed implementation uses one actor and two independently initialized critics with no target modules. The shared-error-only setting remains the reference. Agreement modes none, current, next, and both; beta modes none, experimental linear_y, and l2_y; and schedules sequential, simultaneous, and guarded are executable. A guard can cover the joint update, critics, or actor, and can monitor a separate replay batch. Next-state actor input remains the reconstructed default. See [three-network controlled implementation](docs/research/three_network_core.md) for formulas, detach rules, and limits.
 
 ## Roadmap
 
@@ -100,9 +100,9 @@ To add an algorithm, document its capability metadata and experimental role, add
 
 ## Configurations and outputs
 
-The packaged YAML groups compose with OmegaConf and validate cross-field constraints. The proposed method supports explicit agreement and beta modes, sequential, simultaneous, and guarded schedules, current or next actor input, guard scope and backtracking settings, optional validation-batch monitoring, and interval-controlled gradient diagnostics. It still rejects target networks, identical critic initialization, and delayed actor updates. DDPG and TD3 reserve their own target-network settings. Device is cpu unless explicitly changed.
+The packaged YAML groups compose with OmegaConf and validate cross-field constraints. The proposed method supports explicit agreement and beta modes, sequential, simultaneous, and guarded schedules, current or next actor input, guard scope and backtracking settings, optional validation-batch monitoring, and interval-controlled gradient diagnostics. It still rejects target networks, identical critic initialization, and delayed actor updates. DDPG and TD3 reserve their own target-network settings. Device is cpu unless explicitly changed. The user-facing auto option resolves once to cpu or cuda at runtime; run metadata records both the requested and resolved values. DDPG collection supports gaussian or none exploration modes, and evaluation is always noise-free.
 
-Each training command creates `runs/<experiment>/<algorithm>/<environment>/<timestamp>-seed-<seed>/` and writes the resolved config, seed, Git commit, package versions, UTC start time, CPU/GPU and OS metadata, JSONL metrics, summary, and checkpoint. The summary marks a single smoke run as non-evidentiary. Future study tooling must add final status and multi-seed aggregation. Keep aggregates and figures under `reports/`, linked to raw run IDs.
+Each training command creates `runs/<experiment>/<algorithm>/<environment>/<timestamp>-seed-<seed>/` and writes the resolved config, requested and resolved device, seed, Git commit, package versions, UTC start time, CPU/GPU and OS metadata, JSONL metrics, summary, and checkpoint. The summary marks a single smoke run as non-evidentiary. Future study tooling must add final status and multi-seed aggregation. Keep aggregates and figures under `reports/`, linked to raw run IDs.
 
 ## Reproducibility and comparison policy
 
@@ -120,4 +120,4 @@ The source asks whether removing the target actor preserves stability and return
 
 ## Research documents
 
-Start with [problem](docs/research/problem.md), [notation](docs/research/notation.md), and [architecture](docs/research/architecture.md). The executable proposed-method scope is recorded in [three-network controlled implementation](docs/research/three_network_core.md). Then read the [experiment protocol](docs/research/experiments.md), [reproducibility rules](docs/research/reproducibility.md), [baseline policy](docs/research/baselines.md), and [initial decision record](docs/decisions/0001-research-scaffold.md).
+Start with [problem](docs/research/problem.md), [notation](docs/research/notation.md), and [architecture](docs/research/architecture.md). The executable proposed-method scope is recorded in [three-network controlled implementation](docs/research/three_network_core.md). Then read the [experiment protocol](docs/research/experiments.md), [reproducibility rules](docs/research/reproducibility.md), [baseline policy](docs/research/baselines.md), the [initial decision record](docs/decisions/0001-research-scaffold.md), and the [symmetric beta decision](docs/decisions/0002-defer-symmetric-beta-objective.md).

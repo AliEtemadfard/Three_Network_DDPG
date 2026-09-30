@@ -16,16 +16,16 @@ Use the same environment version, wrappers, normalization, network capacity, rep
 Change one axis at a time unless an interaction is preregistered:
 
 - agreement: none, current, next, both;
-- beta: none, experimental linear_y, l2_y, l2_y_z;
+- beta: none, experimental linear_y, l2_y;
 - schedule: sequential, simultaneous, guarded;
 - guarded scope: joint, critics, actor;
 - actor input: next, current.
 
-Start beta and agreement coefficients from zero references and record the tested values. Do not infer that a quadratic beta variant fixes the linear term. Keep critic initialization independent and actor delay at one until separately implemented and tested.
+l2_y_z is not an available scientific variant. Symmetric Z regularization would define a new advisor-approved, separately named objective. Start beta and agreement coefficients from zero references and record the tested values. Do not infer that a quadratic beta variant fixes the linear term. Keep critic initialization independent and actor delay at one until separately implemented and tested.
 
 ## Guard protocol
 
-The update batch controls acceptance. tolerance, backtracking_factor, maximum_retries, and minimum_learning_rate must be recorded. When independent validation monitoring is enabled, sample a second replay batch and log its shared-error change without using it to accept or reject the proposal.
+The update batch controls acceptance. tolerance, backtracking_factor, maximum_retries, and minimum_learning_rate must be recorded. When independent validation monitoring is enabled, sample a second replay batch and log its shared-error change without using it to accept or reject the proposal. Validation-batch guard metrics remain monitoring-only.
 
 Report accepted and rejected counts, retry distribution, effective candidate learning rate, shared error before and after the candidate, committed error after restoration or acceptance, and validation change. For partial scopes, also report which unguarded phase remained committed.
 
@@ -34,3 +34,5 @@ Report accepted and rejected counts, retry distribution, effective candidate lea
 Record shared TD error, current and next agreement, component losses, Y/Y1/Z1/Z statistics, Q magnitude, actor objective, gradient norms, episode return and length, wall time, parameter count, and memory. At the configured diagnostic interval, record both critics' objective/shared-error gradient inner product and cosine plus the actor/shared-error interaction.
 
 Low shared error, agreement, or acceptance rate alone does not establish good control. Report all seeds, central tendency with uncertainty, and catastrophic divergence. Do not select a variant from one run. Keep raw results under runs/ and aggregate reports under reports/.
+
+Smoke tests verify execution and invariants; they are not scientific evidence. No variant should advance from smoke output alone.

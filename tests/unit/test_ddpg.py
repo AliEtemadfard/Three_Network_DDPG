@@ -4,6 +4,7 @@ from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
+import pytest
 import torch
 
 from three_network_ddpg.algorithms.ddpg import (
@@ -14,6 +15,7 @@ from three_network_ddpg.algorithms.ddpg import (
     ddpg_td_target,
     soft_update,
 )
+from three_network_ddpg.config import load_config
 from three_network_ddpg.core.batches import TransitionBatch
 from three_network_ddpg.core.replay import ReplayBuffer
 from three_network_ddpg.environments import make_environment
@@ -250,3 +252,118 @@ def test_short_pendulum_training_and_evaluation_smoke() -> None:
     finally:
         environment.close()
         evaluation_environment.close()
+
+
+def _configured_ddpg(*overrides: str) -> DDPG:
+    config = load_config(
+        algorithm="ddpg",
+        overrides=["algorithm.hidden_layers=[8,8]", *overrides],
+    )
+    return DDPG.from_config(
+        config.algorithm,
+        observation_dim=3,
+        action_low=np.array([-2.0], dtype=np.float32),
+        action_high=np.array([2.0], dtype=np.float32),
+    )
+
+
+def test_ddpg_none_exploration_mode_disables_collection_noise() -> None:
+    algorithm = _configured_ddpg(
+        "algorithm.exploration_noise.mode=none",
+        "algorithm.exploration_noise.standard_deviation=0.9",
+    )
+    observation = np.array([0.1, -0.2, 0.3], dtype=np.float32)
+
+    first = algorithm.select_action(observation, deterministic=False)
+    second = algorithm.select_action(observation, deterministic=False)
+
+    assert algorithm.settings.exploration_noise_std == 0.0
+    assert not first.exploration_applied
+    assert not second.exploration_applied
+    np.testing.assert_array_equal(first.action, second.action)
+
+
+def test_ddpg_gaussian_exploration_and_evaluation_behavior() -> None:
+    algorithm = _configured_ddpg(
+        "algorithm.exploration_noise.mode=gaussian",
+        "algorithm.exploration_noise.standard_deviation=0.4",
+    )
+    observation = np.array([0.1, -0.2, 0.3], dtype=np.float32)
+
+    exploratory = algorithm.select_action(observation, deterministic=False)
+    assert algorithm.settings.exploration_noise_std == pytest.approx(0.4)
+    assert exploratory.exploration_applied
+
+    algorithm.set_evaluation_mode(True)
+    first = algorithm.select_action(observation, deterministic=False)
+    second = algorithm.select_action(observation, deterministic=False)
+    assert not first.exploration_applied
+    assert not second.exploration_applied
+    np.testing.assert_array_equal(first.action, second.action)
+
+
+@pytest.mark.parametrize("mode", ["ou", "policy", "unsupported"])
+def test_ddpg_rejects_unimplemented_exploration_modes_before_runtime(mode: str) -> None:
+    with pytest.raises(ValueError, match="DDPG exploration noise mode must be gaussian or none"):
+        load_config(
+            algorithm="ddpg",
+            overrides=[f"algorithm.exploration_noise.mode={mode}"],
+        )
+
+
+@pytest.mark.parametrize(
+    ("changed_setting", "changed_value"),
+    [
+        ("gamma", 0.8),
+        ("actor_learning_rate", 2e-3),
+        ("action_low", (-1.0,)),
+    ],
+)
+def test_ddpg_checkpoint_rejects_training_semantic_mismatch(
+    changed_setting: str,
+    changed_value: object,
+) -> None:
+    state = deepcopy(DDPG(_settings()).state_dict())
+    state["settings"][changed_setting] = changed_value
+
+    with pytest.raises(ValueError, match="checkpoint settings do not match"):
+        DDPG(_settings()).load_state_dict(state)
+
+
+def test_ddpg_checkpoint_accepts_normalized_settings_and_device_relocation() -> None:
+    source = DDPG(_settings())
+    source.update_from_batch(_batch())
+    state = deepcopy(source.state_dict())
+    state["settings"]["hidden_layers"] = list(state["settings"]["hidden_layers"])
+    state["settings"]["action_low"] = list(state["settings"]["action_low"])
+    state["settings"]["device"] = "cuda"
+
+    restored = DDPG(_settings())
+    restored.load_state_dict(state)
+
+    for key, value in source.actor.state_dict().items():
+        torch.testing.assert_close(value, restored.actor.state_dict()[key])
+
+
+def test_ddpg_checkpoint_rejects_optimizer_learning_rate_mismatch() -> None:
+    state = deepcopy(DDPG(_settings()).state_dict())
+    state["actor_optimizer"]["param_groups"][0]["lr"] = 0.5
+
+    with pytest.raises(ValueError, match="learning rate"):
+        DDPG(_settings()).load_state_dict(state)
+
+
+def test_ddpg_from_config_resolves_auto_before_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    algorithm = _configured_ddpg("algorithm.device=auto")
+    assert algorithm.settings.device == "cpu"
+
+
+def test_ddpg_checkpoint_rejects_optimizer_beta_mismatch() -> None:
+    state = deepcopy(DDPG(_settings()).state_dict())
+    state["critic_optimizer"]["param_groups"][0]["betas"] = (0.8, 0.999)
+
+    with pytest.raises(ValueError, match="betas"):
+        DDPG(_settings()).load_state_dict(state)

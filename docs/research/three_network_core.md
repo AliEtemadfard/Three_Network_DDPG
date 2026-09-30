@@ -33,9 +33,8 @@ Critic One can add beta_coefficient times one of:
 - none: 0.
 - linear_y: mean(Y), labeled experimental and unbounded below.
 - l2_y: 0.5 * mean(Y ** 2).
-- l2_y_z: 0.5 * mean(Y ** 2 + Z.detach() ** 2).
 
-The final mode reports both magnitudes, but the detached Z component cannot update Critic Two from Critic One's phase. This follows the documented provisional Critic One objective and is a known limitation of this ablation, not a claimed solution.
+l2_y_z is unavailable. With Z detached in Critic One's phase, its Z ** 2 component would not update Critic Two, so exposing that label would misstate the implemented regularization. A future symmetric Y/Z regularizer requires advisor approval and a separately named objective.
 
 ## Schedules
 
@@ -53,7 +52,7 @@ When validation_batch is enabled, the trainer samples a second replay batch. Its
 
 Each learner update logs signed and absolute residual means, shared squared error, both raw agreement errors, component losses, gradient norms, actor objective, and statistics for Y, Y1, Z1, and Z.
 
-Guard metrics include accepted and rejected indicators and totals, retry count, candidate learning rate and scale, update-batch error before and after, committed error after restoration or acceptance, and validation-batch change when configured.
+Guard metrics include accepted and rejected indicators and totals, retry count, last executed candidate learning rate and scale, update-batch error before and after, committed error after restoration or acceptance, and validation-batch change when configured.
 
 At a positive diagnostic_frequency, separate torch.autograd.grad calls measure:
 
@@ -69,7 +68,7 @@ These calls do not write optimizer gradients or alter the training update.
 - All reductions use a batch mean and the shared error includes the specified factor of one half.
 - Independent critic initialization, actor delay of one, and Adam remain fixed implementation constraints.
 - Gaussian exploration is collection only. Evaluation is deterministic.
-- Guard acceptance applies to one sampled batch. Validation is observational. Neither establishes replay-distribution descent or return improvement.
+- Guard acceptance applies to one sampled batch. Validation-batch guard metrics are monitoring-only. Neither establishes replay-distribution descent or return improvement.
 - No agreement, beta, guard, convergence, optimality, monotonic return, efficiency, or novelty claim follows from this implementation.
 
 The implementation supplies controlled mechanisms and diagnostics for unit and smoke verification. Scientific comparison still requires planned multi-seed experiments and theory work.

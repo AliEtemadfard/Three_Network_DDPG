@@ -14,6 +14,7 @@ from three_network_ddpg.algorithms.three_network_ddpg import (
     shared_residual,
     shared_squared_error,
 )
+from three_network_ddpg.config import load_config
 from three_network_ddpg.core.batches import TransitionBatch
 from three_network_ddpg.core.replay import ReplayBuffer
 from three_network_ddpg.environments import TinyContinuousEnv
@@ -97,7 +98,11 @@ def test_beta_regularizer_formulas() -> None:
     torch.testing.assert_close(beta_regularizer("none", y, z), torch.tensor(0.0))
     torch.testing.assert_close(beta_regularizer("linear_y", y, z), torch.tensor(0.5))
     torch.testing.assert_close(beta_regularizer("l2_y", y, z), torch.tensor(1.25))
-    torch.testing.assert_close(beta_regularizer("l2_y_z", y, z), torch.tensor(7.5))
+
+
+def test_l2_y_z_beta_mode_is_rejected_as_undefined() -> None:
+    with pytest.raises(ValueError, match="symmetric Y/Z regularization is not defined"):
+        _settings(beta_mode="l2_y_z", beta_coefficient=0.1)
 
 
 @pytest.mark.parametrize("mode", ["current", "both"])
@@ -162,7 +167,7 @@ def test_next_agreement_uses_detached_z_only_in_critic_one(mode: str) -> None:
     assert _all_gradients_none(algorithm.critic_two)
 
 
-@pytest.mark.parametrize("mode", ["linear_y", "l2_y", "l2_y_z"])
+@pytest.mark.parametrize("mode", ["linear_y", "l2_y"])
 def test_beta_term_is_applied_to_critic_one_formula(mode: str) -> None:
     settings = _settings(beta_mode=mode, beta_coefficient=0.3)
     algorithm = ThreeNetworkDDPG(settings)
@@ -189,7 +194,7 @@ def test_simultaneous_gradients_match_one_preupdate_snapshot(
         agreement_mode="both",
         alpha=0.3,
         alpha_prime=0.4,
-        beta_mode="l2_y_z",
+        beta_mode="l2_y",
         beta_coefficient=0.2,
     )
     algorithm = ThreeNetworkDDPG(settings)
@@ -296,9 +301,12 @@ def test_guard_backtracks_from_same_snapshot_and_accepts_retry(
     monkeypatch.setattr(algorithm, "_shared_error_value", lambda _: next(values))
     outcome = algorithm._run_guard("joint", _batch(), None)
     assert outcome.accepted
+    assert outcome.termination_reason == "accepted"
     assert outcome.retries == 1
     assert outcome.learning_rate_scale == pytest.approx(0.25)
     assert outcome.effective_learning_rate == pytest.approx(2.5e-4)
+    assert outcome.error_before == pytest.approx(1.0)
+    assert outcome.error_after == pytest.approx(0.5)
     assert algorithm.actor_optimizer.param_groups[0]["lr"] == pytest.approx(1e-3)
     assert algorithm.critic_one_optimizer.param_groups[0]["lr"] == pytest.approx(1e-3)
     assert algorithm.critic_two_optimizer.param_groups[0]["lr"] == pytest.approx(1e-3)
@@ -409,3 +417,131 @@ def test_trainer_draws_validation_batch_for_guarded_monitoring() -> None:
         assert "guard_validation_error_change" in {metric.name for metric in summary.metrics}
     finally:
         environment.close()
+
+
+def test_guard_first_proposal_metrics_are_consistent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    algorithm = ThreeNetworkDDPG(_settings(update_schedule="guarded", guard_scope="joint"))
+    values = iter((1.0, 0.5))
+    monkeypatch.setattr(algorithm, "_shared_error_value", lambda _: next(values))
+
+    outcome = algorithm._run_guard("joint", _batch(), None)
+
+    assert outcome.accepted
+    assert outcome.termination_reason == "accepted"
+    assert outcome.retries == 0
+    assert outcome.learning_rate_scale == pytest.approx(1.0)
+    assert outcome.effective_learning_rate == pytest.approx(1e-3)
+    assert outcome.error_before == pytest.approx(1.0)
+    assert outcome.error_after == pytest.approx(0.5)
+
+
+def test_guard_all_attempted_proposals_rejected_reports_last_attempt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    algorithm = ThreeNetworkDDPG(
+        _settings(
+            update_schedule="guarded",
+            guard_scope="joint",
+            guard_backtracking_factor=0.5,
+            guard_maximum_retries=2,
+        )
+    )
+    values = iter((1.0, 2.0, 1.8, 1.4, 1.0))
+    monkeypatch.setattr(algorithm, "_shared_error_value", lambda _: next(values))
+
+    outcome = algorithm._run_guard("joint", _batch(), None)
+
+    assert not outcome.accepted
+    assert outcome.termination_reason == "retries_exhausted"
+    assert outcome.retries == 2
+    assert outcome.learning_rate_scale == pytest.approx(0.25)
+    assert outcome.effective_learning_rate == pytest.approx(2.5e-4)
+    assert outcome.error_before == pytest.approx(1.0)
+    assert outcome.error_after == pytest.approx(1.4)
+    assert outcome.committed_error_after == pytest.approx(1.0)
+
+
+def test_guard_minimum_rate_reports_previous_executed_proposal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    algorithm = ThreeNetworkDDPG(
+        _settings(
+            update_schedule="guarded",
+            guard_scope="joint",
+            guard_backtracking_factor=0.1,
+            guard_maximum_retries=2,
+            guard_minimum_learning_rate=5e-4,
+        )
+    )
+    values = iter((1.0, 2.0, 1.0))
+    monkeypatch.setattr(algorithm, "_shared_error_value", lambda _: next(values))
+
+    outcome = algorithm._run_guard("joint", _batch(), None)
+
+    assert not outcome.accepted
+    assert outcome.termination_reason == "minimum_learning_rate"
+    assert outcome.retries == 0
+    assert outcome.learning_rate_scale == pytest.approx(1.0)
+    assert outcome.effective_learning_rate == pytest.approx(1e-3)
+    assert outcome.error_before == pytest.approx(1.0)
+    assert outcome.error_after == pytest.approx(2.0)
+    assert outcome.committed_error_after == pytest.approx(1.0)
+
+
+def test_three_network_config_rejects_undefined_l2_y_z_mode() -> None:
+    with pytest.raises(ValueError, match="separately approved objective"):
+        load_config(
+            algorithm="three_network_ddpg",
+            overrides=[
+                "algorithm.beta_regularizer.mode=l2_y_z",
+                "algorithm.beta_regularizer.coefficient=0.1",
+            ],
+        )
+
+
+def test_three_network_from_config_resolves_auto_before_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    config = load_config(
+        algorithm="three_network_ddpg",
+        overrides=["algorithm.device=auto"],
+    )
+    algorithm = ThreeNetworkDDPG.from_config(
+        config.algorithm,
+        observation_dim=3,
+        action_low=torch.tensor([-2.0]).numpy(),
+        action_high=torch.tensor([2.0]).numpy(),
+    )
+    assert algorithm.settings.device == "cpu"
+
+
+def test_guard_metric_record_fields_describe_one_executed_proposal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    algorithm = ThreeNetworkDDPG(
+        _settings(
+            update_schedule="guarded",
+            guard_scope="joint",
+            guard_backtracking_factor=0.25,
+            guard_maximum_retries=1,
+        )
+    )
+    values = iter((1.0, 2.0, 0.5))
+    monkeypatch.setattr(algorithm, "_shared_error_value", lambda _: next(values))
+
+    result = algorithm.update_from_batch(_batch())
+    metrics = {metric.name: metric.value for metric in result.metrics}
+
+    assert result.updates_applied == 1
+    assert metrics["guard_accepted_step"] == 1.0
+    assert metrics["guard_rejected_step"] == 0.0
+    assert metrics["guard_retry_count"] == 1.0
+    assert metrics["guard_learning_rate_scale"] == pytest.approx(0.25)
+    assert metrics["guard_effective_learning_rate"] == pytest.approx(2.5e-4)
+    assert metrics["guard_error_before"] == pytest.approx(1.0)
+    assert metrics["guard_error_after"] == pytest.approx(0.5)
+    assert metrics["guard_stopped_at_minimum_learning_rate"] == 0.0
+    assert metrics["guard_retries_exhausted"] == 0.0

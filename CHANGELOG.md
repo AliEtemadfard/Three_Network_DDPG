@@ -10,3 +10,5 @@
 
 - Implement the experimental target-free three-network shared-error core with sequential and simultaneous schedules, explicit stop-gradient paths, optional actor/residual diagnostics, checkpointing, strict configuration validation, and deterministic and Pendulum smoke coverage. Agreement penalties, beta regularization, guarded updates, and convergence claims remain out of scope.
 - Add controlled current and next critic agreement, experimental beta variants, same-snapshot simultaneous updates, recomputing sequential updates, scoped guarded backtracking with full optimizer restoration, independent validation monitoring, and interval-controlled critic and actor gradient diagnostics. These mechanisms remain experimental and establish no convergence claim.
+
+- Reject the undefined l2_y_z beta mode, honor DDPG exploration mode, centralize auto device resolution, enforce semantic checkpoint compatibility, and report guarded backtracking metrics for the last executed proposal.

@@ -11,7 +11,7 @@ from .algorithms.registry import get_algorithm_metadata
 
 _NAME = re.compile(r"[a-z][a-z0-9_]*\Z")
 _AGREEMENT = {"none", "current", "next", "both"}
-_BETA = {"none", "linear_y", "l2_y", "l2_y_z"}
+_BETA = {"none", "linear_y", "l2_y"}
 _SCHEDULE = {"simultaneous", "sequential", "alternating", "guarded"}
 
 
@@ -124,12 +124,20 @@ def validate_config(config: DictConfig) -> None:
             errors.append("verified DDPG requires action rescaling")
         if algorithm.actor_update_delay != 1:
             errors.append("standard DDPG updates its actor every update")
+        if algorithm.exploration_noise.mode not in {"gaussian", "none"}:
+            errors.append("DDPG exploration noise mode must be gaussian or none")
         noise_clip = algorithm.exploration_noise.clip
         if noise_clip is not None and not _number(noise_clip, positive=True):
             errors.append("exploration noise clip must be positive when configured")
     if algorithm.agreement_mode not in _AGREEMENT:
         errors.append("algorithm.agreement_mode is invalid")
-    if algorithm.beta_regularizer.mode not in _BETA:
+    beta_mode = algorithm.beta_regularizer.mode
+    if beta_mode == "l2_y_z":
+        errors.append(
+            "l2_y_z is unavailable because symmetric Y/Z regularization requires a "
+            "separately approved objective"
+        )
+    elif beta_mode not in _BETA:
         errors.append("algorithm.beta_regularizer.mode is invalid")
     if algorithm.update_schedule not in _SCHEDULE:
         errors.append("algorithm.update_schedule is invalid")
@@ -141,6 +149,9 @@ def validate_config(config: DictConfig) -> None:
         errors.append("algorithm.device is invalid")
     if algorithm.exploration_noise.mode not in {"gaussian", "ou", "policy", "none"}:
         errors.append("algorithm.exploration_noise.mode is invalid")
+    noise_standard_deviation = algorithm.exploration_noise.standard_deviation
+    if noise_standard_deviation is not None and not _number(noise_standard_deviation, nonnegative=True):
+        errors.append("algorithm.exploration_noise.standard_deviation must be nonnegative")
     if not _number(algorithm.gamma, positive=True) or algorithm.gamma > 1:
         errors.append("algorithm.gamma must be in (0, 1]")
     for name in (

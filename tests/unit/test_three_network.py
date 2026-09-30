@@ -421,3 +421,24 @@ def test_short_pendulum_interaction_smoke() -> None:
         assert summary.gradient_updates == 8
     finally:
         environment.close()
+
+
+def test_three_network_checkpoint_normalizes_settings_and_allows_device_relocation() -> None:
+    source = ThreeNetworkDDPG(_settings())
+    state = deepcopy(source.state_dict())
+    state["settings"]["hidden_layers"] = list(state["settings"]["hidden_layers"])
+    state["settings"]["device"] = "cuda"
+
+    restored = ThreeNetworkDDPG(_settings())
+    restored.load_state_dict(state)
+
+    for key, value in source.actor.state_dict().items():
+        torch.testing.assert_close(value, restored.actor.state_dict()[key])
+
+
+def test_three_network_checkpoint_rejects_semantic_mismatch() -> None:
+    state = deepcopy(ThreeNetworkDDPG(_settings()).state_dict())
+    state["settings"]["gamma"] = 0.8
+
+    with pytest.raises(ValueError, match="checkpoint settings do not match"):
+        ThreeNetworkDDPG(_settings()).load_state_dict(state)

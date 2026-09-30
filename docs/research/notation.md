@@ -18,8 +18,7 @@ The beta modes are:
 - none: zero.
 - linear_y: mean(Y), the original experimental proposal.
 - l2_y: 0.5 * mean(Y ** 2).
-- l2_y_z: 0.5 * mean(Y ** 2 + Z ** 2).
 
-The beta term belongs to Critic One's provisional objective. The stop gradient on Z therefore makes the Z ** 2 component a measured constant during that phase; it does not update Critic Two. This limitation is recorded rather than silently changing the research specification. The linear term is unbounded below with respect to Y, and the quadratic variants are hypotheses rather than proved fixes.
+The beta term belongs to Critic One's provisional objective. l2_y_z is unavailable: under the stop-gradient contract its Z ** 2 component would be constant during Critic One's phase and would not regularize Critic Two. A symmetric Y/Z regularizer would be a new, separately named objective and requires advisor approval. The linear term is unbounded below with respect to Y, and l2_y is a hypothesis rather than a proved fix.
 
 Agreement mode may be none, current, next, or both. alpha_prime weights current agreement in Critic Two and alpha weights next agreement in Critic One. See the [stop gradient matrix](architecture.md).

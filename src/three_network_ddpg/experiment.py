@@ -5,9 +5,10 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from .algorithms.registry import create_algorithm
+from .core.devices import resolve_device
 from .core.interfaces import MetricRecord, OffPolicyAlgorithm
 from .core.metadata import prepare_run_directory
 from .core.replay import ReplayBuffer
@@ -29,9 +30,11 @@ def _run_off_policy_experiment(
     try:
         if training_environment.observation_space.shape is None:
             raise ValueError("observation space must expose a shape")
+        resolved_device = resolve_device(str(config.algorithm.device))
+        runtime_algorithm_config = OmegaConf.merge(config.algorithm, {"device": resolved_device})
         algorithm = create_algorithm(
             expected_algorithm,
-            algorithm_config=config.algorithm,
+            algorithm_config=runtime_algorithm_config,
             observation_dim=int(training_environment.observation_space.shape[0]),
             action_low=training_environment.action_space.low,
             action_high=training_environment.action_space.high,
@@ -44,7 +47,7 @@ def _run_off_policy_experiment(
             action_shape=training_environment.action_space.shape,
             seed=int(config.algorithm.seed),
             bootstrap_on_truncation=bool(config.experiment.bootstrap_on_truncation),
-            device=str(config.algorithm.device),
+            device=resolved_device,
         )
         evaluation_results: list[EvaluationResult] = []
 
