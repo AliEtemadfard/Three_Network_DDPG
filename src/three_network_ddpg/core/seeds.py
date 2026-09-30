@@ -15,6 +15,9 @@ class SeedReport:
     seed: int
     deterministic_algorithms_requested: bool
     cuda_available: bool
+    python_seeded: bool
+    numpy_seeded: bool
+    torch_seeded: bool
 
 
 def _check_seed(seed: int) -> None:
@@ -25,9 +28,16 @@ def _check_seed(seed: int) -> None:
 def seed_everything(seed: int, *, deterministic_algorithms: bool = False) -> SeedReport:
     """Seed global RNGs; exact determinism across devices is not guaranteed."""
     _check_seed(seed)
+    python_seeded = False
+    numpy_seeded = False
+    torch_seeded = False
+
     random.seed(seed)
+    python_seeded = True
     np.random.seed(seed)
+    numpy_seeded = True
     torch.manual_seed(seed)
+    torch_seeded = True
     cuda_available = torch.cuda.is_available()
     if cuda_available:
         torch.cuda.manual_seed_all(seed)
@@ -35,7 +45,14 @@ def seed_everything(seed: int, *, deterministic_algorithms: bool = False) -> See
     if torch.backends.cudnn.is_available():
         torch.backends.cudnn.deterministic = deterministic_algorithms
         torch.backends.cudnn.benchmark = not deterministic_algorithms
-    return SeedReport(seed, deterministic_algorithms, cuda_available)
+    return SeedReport(
+        seed=seed,
+        deterministic_algorithms_requested=deterministic_algorithms,
+        cuda_available=cuda_available,
+        python_seeded=python_seeded,
+        numpy_seeded=numpy_seeded,
+        torch_seeded=torch_seeded,
+    )
 
 
 def seed_action_space(action_space: Any, seed: int) -> None:

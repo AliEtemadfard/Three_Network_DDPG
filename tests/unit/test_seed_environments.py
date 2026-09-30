@@ -13,11 +13,17 @@ from three_network_ddpg.environments import TinyContinuousEnv, make_environment
 
 
 def test_seed_repeats_python_numpy_and_torch() -> None:
-    seed_everything(23, deterministic_algorithms=True)
+    first_report = seed_everything(23, deterministic_algorithms=True)
     first = (random.random(), np.random.random(), torch.rand(1).item())
-    seed_everything(23, deterministic_algorithms=True)
+    second_report = seed_everything(23, deterministic_algorithms=True)
     second = (random.random(), np.random.random(), torch.rand(1).item())
     assert first == second
+    assert first_report == second_report
+    assert first_report.python_seeded
+    assert first_report.numpy_seeded
+    assert first_report.torch_seeded
+    assert first_report.cuda_available is torch.cuda.is_available()
+    assert first_report.deterministic_algorithms_requested
     assert torch.are_deterministic_algorithms_enabled()
     seed_everything(23, deterministic_algorithms=False)
     with pytest.raises(ValueError, match="seed must"):
