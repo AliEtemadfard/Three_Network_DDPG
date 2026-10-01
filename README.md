@@ -162,3 +162,5 @@ The source asks whether removing the target actor preserves stability and return
 ## Research documents
 
 Start with [problem](docs/research/problem.md), [notation](docs/research/notation.md), and [architecture](docs/research/architecture.md). The executable proposed-method scope is recorded in [three-network controlled implementation](docs/research/three_network_core.md). Then read the [experiment protocol](docs/research/experiments.md), [reproducibility rules](docs/research/reproducibility.md), [baseline policy](docs/research/baselines.md), the [initial decision record](docs/decisions/0001-research-scaffold.md), and the [symmetric beta decision](docs/decisions/0002-defer-symmetric-beta-objective.md).
+
+The first manually launched Pendulum-v1 development pilot is prepared in [the Pilot 01 guide](docs/manual_pendulum_pilot_01.md); it must be launched and inspected stage-by-stage by an operator.
