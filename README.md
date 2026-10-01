@@ -1,6 +1,6 @@
 # Three Network DDPG
 
-**Status:** The standard four-network DDPG baseline and the controlled `ddpg_no_target_actor` ablation are verified by focused CPU tests. The proposed target-free three-network method now has an experimental executable core with controlled agreement, beta, simultaneous, sequential, and guarded ablations. TD3, SAC, A2C, and A3C remain unimplemented. The [original research specification](docs/research/source/Three_Network_DDPG_Research_Specification.docx) is preserved verbatim.
+**Status:** The standard four-network DDPG baseline and the controlled `ddpg_no_target_actor` ablation are verified by focused CPU tests. The proposed target-free three-network method has an experimental executable core with controlled agreement, beta, simultaneous, sequential, and guarded ablations. A manifest-driven experiment, resume, aggregation, and plotting pipeline is available. TD3, SAC, A2C, and A3C remain unimplemented. The [original research specification](docs/research/source/Three_Network_DDPG_Research_Specification.docx) is preserved verbatim.
 
 DDPG uses a deterministic actor and a value critic, usually with slowly updated target copies of both networks. Target networks reduce movement in the bootstrap target but do not establish general convergence for nonlinear actor–critic learning. They also add parameter storage. This project asks whether one actor and two independently optimized critics can maintain a useful Bellman relation without target networks in the proposed main variant.
 
@@ -89,7 +89,39 @@ three-network-ddpg train-three-network --environment pendulum_v1 --experiment th
 The environment smoke performs a CPU PyTorch operation and one seeded `Pendulum-v1` transition. Training commands use execution-check budgets and produce no scientific evidence.
 For local TensorBoard or plotting support, install `.[tracking]` or `.[plotting]`. Weights & Biases remains optional under `.[wandb]`. No account or network service is required for default local tracking.
 
-**Available:** `DDPG`, experimental `DDPGNoTargetActor`, experimental `ThreeNetworkDDPG`, `ReplayBuffer`, `OffPolicyTrainer`, `evaluate`, `make_environment`, action transforms, seed helpers, and `prepare_run_directory`. All three training commands write resolved configuration, metadata, JSONL metrics, a summary, and a checkpoint. TD3, SAC, A2C, and A3C remain `planned` and cannot enter the trainer. Plotting and general checkpoint-management commands are planned.
+**Available:** `DDPG`, experimental `DDPGNoTargetActor`, experimental `ThreeNetworkDDPG`, `ReplayBuffer`, `OffPolicyTrainer`, `evaluate`, `make_environment`, action transforms, seed helpers, `prepare_run_directory`, and the manifest experiment pipeline. All three direct training commands write resolved configuration, metadata, JSONL metrics, a summary, and a checkpoint. TD3, SAC, A2C, and A3C remain `planned` and cannot enter the trainer or a manifest matrix.
+
+## Manifest experiment workflow
+
+`experiments/manifests/smoke.yaml` is a single-seed, 128-step infrastructure check. `development.yaml` and `confirmatory.yaml` are reviewable examples only; do not execute them until their budgets, coefficients, and preregistration are approved. `plan` is the dry-run command and never creates a study or trains. `run` executes only never-started run IDs. `resume` retries incomplete, interrupted, or failed run IDs while preserving prior attempts; divergent and non-finite runs remain reportable terminal outcomes.
+
+PowerShell:
+
+~~~powershell
+$Manifest = "experiments/manifests/smoke.yaml"
+three-network-ddpg experiment validate $Manifest
+three-network-ddpg experiment plan $Manifest
+three-network-ddpg experiment run $Manifest
+three-network-ddpg experiment status $Manifest
+three-network-ddpg experiment resume $Manifest
+three-network-ddpg experiment aggregate $Manifest
+three-network-ddpg experiment plot $Manifest --metric evaluation_return_mean
+~~~
+
+Bash:
+
+~~~bash
+manifest="experiments/manifests/smoke.yaml"
+three-network-ddpg experiment validate "$manifest"
+three-network-ddpg experiment plan "$manifest"
+three-network-ddpg experiment run "$manifest"
+three-network-ddpg experiment status "$manifest"
+three-network-ddpg experiment resume "$manifest"
+three-network-ddpg experiment aggregate "$manifest"
+three-network-ddpg experiment plot "$manifest" --metric evaluation_return_mean
+~~~
+
+The study directory freezes the source manifest, expanded matrix, resolved configs, configuration hashes, run IDs, and Git commit. Each attempt records package and hardware metadata, UTC start/end timestamps, append-safe JSONL metrics, and an atomic terminal marker. Statuses distinguish `completed`, `interrupted`, `failed`, `divergent`, and `non_finite`; reports retain every planned run and never treat a smoke as scientific evidence.
 
 ## Layout and extension points
 
@@ -111,7 +143,7 @@ To add an algorithm, document its capability metadata and experimental role, add
 
 The packaged YAML groups compose with OmegaConf and validate cross-field constraints. The proposed method supports explicit agreement and beta modes, sequential, simultaneous, and guarded schedules, current or next actor input, guard scope and backtracking settings, optional validation-batch monitoring, and interval-controlled gradient diagnostics. It still rejects target networks, identical critic initialization, and delayed actor updates. `ddpg_no_target_actor` requires `target_networks.actor=false` and `target_networks.critic=true`; standard DDPG and TD3 retain both targets. Device is cpu unless explicitly changed. The user-facing auto option resolves once to cpu or cuda at runtime; run metadata records both the requested and resolved values. Both DDPG baselines support gaussian or none collection exploration modes, and evaluation is always noise-free.
 
-Each training command creates `runs/<experiment>/<algorithm>/<environment>/<timestamp>-seed-<seed>/` and writes the resolved config, requested and resolved device, seed, Git commit, package versions, UTC start time, CPU/GPU and OS metadata, JSONL metrics, summary, and checkpoint. The summary marks a single smoke run as non-evidentiary. Future study tooling must add final status and multi-seed aggregation. Keep aggregates and figures under `reports/`, linked to raw run IDs.
+Each direct training command creates `runs/<experiment>/<algorithm>/<environment>/<timestamp>-seed-<seed>/` and writes the resolved config, requested and resolved device, seed, Git commit, package versions, UTC start time, CPU/GPU and OS metadata, JSONL metrics, summary, and checkpoint. Manifest studies use stable variant/run IDs under `runs/protocol-v2/<study>/`, preserve immutable attempts, and write aggregates and SVG plots under the study's `reports/` directory. The summary marks a single smoke run as non-evidentiary.
 
 ## Reproducibility and comparison policy
 

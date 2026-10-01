@@ -1,0 +1,109 @@
+schema_version: 2
+name: development-example
+description: Infrastructure example only; values are not a preregistered scientific plan.
+defaults:
+  environment: tiny_continuous
+  experiment: ddpg_baseline
+training_seeds: [11, 22, 33]
+evaluation_seeds: [1001, 1002, 1003, 1004, 1005]
+variants:
+  - id: ddpg
+    algorithm: ddpg
+    overrides:
+      - experiment.total_steps=20000
+      - experiment.warmup_steps=256
+      - experiment.evaluation_frequency=1000
+      - experiment.evaluation_episodes=5
+  - id: ddpg-no-target-actor
+    algorithm: ddpg_no_target_actor
+    experiment: ddpg_no_target_actor
+    overrides:
+      - experiment.total_steps=20000
+      - experiment.warmup_steps=256
+      - experiment.evaluation_frequency=1000
+      - experiment.evaluation_episodes=5
+  - id: three-network-shared-error
+    algorithm: three_network_ddpg
+    experiment: three_network_core
+    overrides:
+      - experiment.total_steps=20000
+      - experiment.warmup_steps=256
+      - experiment.evaluation_frequency=1000
+      - experiment.evaluation_episodes=5
+      - algorithm.agreement_mode=none
+      - algorithm.beta_regularizer.mode=none
+      - algorithm.beta_regularizer.coefficient=0.0
+  - id: three-network-current-agreement
+    algorithm: three_network_ddpg
+    experiment: three_network_core
+    overrides:
+      - experiment.total_steps=20000
+      - experiment.warmup_steps=256
+      - experiment.evaluation_frequency=1000
+      - experiment.evaluation_episodes=5
+      - algorithm.agreement_mode=current
+      - algorithm.alpha=0.0
+      - algorithm.alpha_prime=0.1
+      - algorithm.beta_regularizer.mode=none
+      - algorithm.beta_regularizer.coefficient=0.0
+  - id: three-network-next-agreement
+    algorithm: three_network_ddpg
+    experiment: three_network_core
+    overrides:
+      - experiment.total_steps=20000
+      - experiment.warmup_steps=256
+      - experiment.evaluation_frequency=1000
+      - experiment.evaluation_episodes=5
+      - algorithm.agreement_mode=next
+      - algorithm.alpha=0.1
+      - algorithm.alpha_prime=0.0
+      - algorithm.beta_regularizer.mode=none
+      - algorithm.beta_regularizer.coefficient=0.0
+  - id: three-network-both-agreements
+    algorithm: three_network_ddpg
+    experiment: three_network_core
+    overrides:
+      - experiment.total_steps=20000
+      - experiment.warmup_steps=256
+      - experiment.evaluation_frequency=1000
+      - experiment.evaluation_episodes=5
+      - algorithm.agreement_mode=both
+      - algorithm.alpha=0.1
+      - algorithm.alpha_prime=0.1
+      - algorithm.beta_regularizer.mode=none
+      - algorithm.beta_regularizer.coefficient=0.0
+  - id: three-network-guarded
+    algorithm: three_network_ddpg
+    experiment: three_network_core
+    overrides:
+      - experiment.total_steps=20000
+      - experiment.warmup_steps=256
+      - experiment.evaluation_frequency=1000
+      - experiment.evaluation_episodes=5
+      - algorithm.agreement_mode=none
+      - algorithm.beta_regularizer.mode=none
+      - algorithm.beta_regularizer.coefficient=0.0
+      - algorithm.update_schedule=guarded
+      - algorithm.guard.scope=joint
+      - algorithm.guard.tolerance=0.0
+      - algorithm.guard.backtracking_factor=0.5
+      - algorithm.guard.maximum_retries=5
+      - algorithm.guard.minimum_learning_rate=0.000001
+      - algorithm.guard.validation_batch=true
+execution:
+  output_root: runs/protocol-v2
+  workers: 1
+analysis:
+  last_k: 5
+  bootstrap_samples: 2000
+  confidence_level: 0.95
+  bootstrap_seed: 20260930
+preregistration:
+  hypothesis: Infrastructure example only; replace before scientific execution.
+  fixed_factors: [environment, step budget, evaluation seeds]
+  varied_factors: [algorithm]
+  primary_metrics: [evaluation_return_mean, final_return_last_k, normalized_auc]
+  mechanism_metrics: [shared_squared_error, q_absolute_mean, gradient diagnostics]
+  failure_and_divergence_rules: Non-finite metrics are non_finite; numerical divergence is divergent; all other exceptions are failed.
+  stopping_rules: Fixed environment-step budget; no outcome-dependent stopping.
+  candidate_selection_rules: Must be fixed before a confirmatory run.

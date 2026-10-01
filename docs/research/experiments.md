@@ -37,3 +37,13 @@ Record shared TD error, current and next agreement, component losses, Y/Y1/Z1/Z 
 Low shared error, agreement, or acceptance rate alone does not establish good control. Report all seeds, central tendency with uncertainty, and catastrophic divergence. Do not select a variant from one run. Keep raw results under runs/ and aggregate reports under reports/.
 
 Smoke tests verify execution and invariants; they are not scientific evidence. In particular, the target-actor ablation must not be described as stable before controlled multi-seed results exist. No variant should advance from smoke output alone.
+
+## Executable manifest protocol
+
+Version 2 manifests pair the same ordered training seeds across every variant and use a separate fixed evaluation-seed set. Stable variant and run hashes derive from the resolved configuration and seed identity. Validation rejects planned algorithms and the undefined `l2_y_z` objective before any run directory is created. The supplied development and confirmatory manifests include DDPG, DDPG without a target actor, shared-error-only, current-agreement, next-agreement, both-agreements, and guarded variants. TD3 remains excluded until it is implemented.
+
+`experiment validate` composes every configuration. `experiment plan` prints the complete matrix without writing artifacts. `experiment run` is run-only-missing, while `experiment resume` creates a new immutable attempt for incomplete, interrupted, or failed runs. Reuse is refused when the frozen manifest hash, resolved configuration hash, or Git commit differs unless `--restart` explicitly archives the incompatible study.
+
+Terminal states are `completed`, `interrupted`, `failed`, `divergent`, and `non_finite`. Aggregation includes every planned run and its failure reason, but computes numerical summaries only from completed runs with finite metrics. Reports include counts, completion rate, mean, sample standard deviation, median, IQR, bootstrap confidence intervals, per-seed curves, last-k return, and normalized learning-curve area. A confidence interval is omitted when fewer than two completed seeds contribute. Curves use the union of environment-step coordinates, interpolate only within each run's observed range, and never extrapolate.
+
+The guarded variant's independent validation batch is monitoring-only. It may be logged and aggregated, but it never controls acceptance or rejection.

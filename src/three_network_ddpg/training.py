@@ -56,6 +56,7 @@ class OffPolicyTrainer:
         replay: ReplayBuffer,
         settings: TrainerSettings,
         evaluation_callback: Callable[[int, OffPolicyAlgorithm], tuple[MetricRecord, ...]] | None = None,
+        metric_sink: Callable[[MetricRecord], None] | None = None,
     ) -> None:
         if not isinstance(algorithm, OffPolicyAlgorithm):
             raise TypeError("off-policy trainer requires OffPolicyAlgorithm")
@@ -82,6 +83,13 @@ class OffPolicyTrainer:
         self.replay = replay
         self.settings = settings
         self.evaluation_callback = evaluation_callback
+        self.metric_sink = metric_sink
+
+    def _record(self, metrics: list[MetricRecord], records: tuple[MetricRecord, ...]) -> None:
+        metrics.extend(records)
+        if self.metric_sink is not None:
+            for record in records:
+                self.metric_sink(record)
 
     def run(self, *, seed: int, deterministic_algorithms: bool = False) -> TrainingSummary:
         """Collect transitions, sample replay, and delegate updates."""
@@ -137,15 +145,16 @@ class OffPolicyTrainer:
                 if not isinstance(result, UpdateResult):
                     raise TypeError("algorithm update must return UpdateResult")
                 gradient_updates += result.updates_applied
-                metrics.extend(result.metrics)
+                self._record(metrics, result.metrics)
             if terminated or truncated:
                 completed_returns.append(episode_return)
                 completed_lengths.append(episode_length)
-                metrics.extend(
+                self._record(
+                    metrics,
                     (
                         MetricRecord("episode_return", episode_return, step + 1, "train"),
                         MetricRecord("episode_length", float(episode_length), step + 1, "train"),
-                    )
+                    ),
                 )
                 episode_return = 0.0
                 episode_length = 0
@@ -158,16 +167,17 @@ class OffPolicyTrainer:
                 and self.settings.evaluation_frequency is not None
                 and (step + 1) % self.settings.evaluation_frequency == 0
             ):
-                metrics.extend(self.evaluation_callback(step + 1, self.algorithm))
+                self._record(metrics, self.evaluation_callback(step + 1, self.algorithm))
         wall_time = perf_counter() - started
-        metrics.extend(
+        self._record(
+            metrics,
             (
                 MetricRecord(
                     "environment_steps", float(self.settings.total_steps), self.settings.total_steps, "train"
                 ),
                 MetricRecord("update_steps", float(gradient_updates), self.settings.total_steps, "train"),
                 MetricRecord("wall_time_seconds", wall_time, self.settings.total_steps, "train"),
-            )
+            ),
         )
         return TrainingSummary(
             environment_steps=self.settings.total_steps,
