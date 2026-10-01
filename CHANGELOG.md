@@ -16,3 +16,5 @@
 - Reject the undefined l2_y_z beta mode, honor DDPG exploration mode, centralize auto device resolution, enforce semantic checkpoint compatibility, and report guarded backtracking metrics for the last executed proposal.
 
 - Add the experimental `ddpg_no_target_actor` baseline with detached online-actor bootstrapping through a target critic, target-critic-only Polyak updates, distinct configuration and checkpoint identity, and deterministic and Pendulum smoke coverage. Stability remains unestablished pending multi-seed studies.
+
+- Add versioned experiment manifests, stable run identities, paired training and fixed evaluation seeds, crash-safe attempts and resume, explicit completion/failure states, failure-aware bootstrap aggregation, per-seed SVG plots, bounded smoke infrastructure, and PowerShell/Bash operating instructions. No scientific result is claimed.

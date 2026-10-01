@@ -1,0 +1,32 @@
+# Copy this file, replace every REQUIRED value, review it, and freeze it before execution.
+schema_version: 2
+name: required-plan-name
+description: REQUIRED
+defaults:
+  environment: pendulum_v1
+  experiment: ddpg_baseline
+training_seeds: [REQUIRED]
+evaluation_seeds: [REQUIRED_DISTINCT_FROM_TRAINING]
+variants:
+  - id: required-variant
+    algorithm: ddpg
+    overrides:
+      - experiment.total_steps=REQUIRED
+execution:
+  output_root: runs/protocol-v2
+  workers: 1
+analysis:
+  last_k: REQUIRED
+  bootstrap_samples: 10000
+  confidence_level: 0.95
+  bootstrap_seed: REQUIRED
+preregistration:
+  hypothesis: REQUIRED
+  fixed_factors: [REQUIRED]
+  varied_factors: [REQUIRED]
+  environment_step_budget: REQUIRED
+  primary_metrics: [REQUIRED]
+  mechanism_metrics: [REQUIRED]
+  failure_and_divergence_rules: REQUIRED
+  stopping_rules: REQUIRED
+  candidate_selection_rules: REQUIRED

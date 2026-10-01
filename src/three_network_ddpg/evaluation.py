@@ -1,5 +1,6 @@
 """Evaluation is separate from replay collection and requests noise-free actions."""
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import gymnasium as gym
@@ -25,10 +26,14 @@ def evaluate(
     episodes: int,
     seed: int,
     clip_actions: bool,
+    seeds: Sequence[int] | None = None,
 ) -> EvaluationResult:
     """Evaluate a policy on a separate environment with exploration disabled."""
+    evaluation_seeds = tuple(seeds) if seeds is not None else tuple(seed + i for i in range(episodes))
     if episodes <= 0:
         raise ValueError("episodes must be positive")
+    if len(evaluation_seeds) != episodes or len(set(evaluation_seeds)) != episodes:
+        raise ValueError("evaluation seeds must be unique and match the episode count")
     if algorithm.capabilities.implementation_status == "planned":
         raise ValueError("planned algorithms cannot be evaluated")
     require_continuous_spaces(environment)
@@ -36,8 +41,8 @@ def evaluate(
     lengths: list[int] = []
     algorithm.set_evaluation_mode(True)
     try:
-        for episode in range(episodes):
-            observation, _ = seed_environment(environment, seed + episode)
+        for evaluation_seed in evaluation_seeds:
+            observation, _ = seed_environment(environment, evaluation_seed)
             episode_return = 0.0
             length = 0
             while True:

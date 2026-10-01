@@ -1,0 +1,35 @@
+schema_version: 2
+name: protocol-smoke
+description: One-seed bounded infrastructure smoke; never use as scientific evidence.
+defaults:
+  environment: tiny_continuous
+  experiment: ddpg_baseline
+training_seeds: [17]
+evaluation_seeds: [901, 902]
+variants:
+  - id: ddpg-smoke
+    algorithm: ddpg
+    overrides:
+      - experiment.total_steps=128
+      - experiment.warmup_steps=16
+      - experiment.batch_size=16
+      - experiment.replay_capacity=512
+      - experiment.evaluation_frequency=64
+      - experiment.evaluation_episodes=2
+execution:
+  output_root: runs/protocol-v2
+  workers: 1
+analysis:
+  last_k: 2
+  bootstrap_samples: 200
+  confidence_level: 0.95
+  bootstrap_seed: 17
+preregistration:
+  hypothesis: Infrastructure execution only; no scientific hypothesis is tested.
+  fixed_factors: [environment, step budget, evaluation seeds]
+  varied_factors: [none]
+  primary_metrics: [evaluation_return_mean]
+  mechanism_metrics: []
+  failure_and_divergence_rules: Preserve completed, interrupted, failed, divergent, and non_finite states.
+  stopping_rules: Fixed at 128 environment steps.
+  candidate_selection_rules: Not applicable to an infrastructure smoke.
