@@ -7,8 +7,10 @@ All commands below use the installed CLI syntax verified for the canonical Conda
 ## Preflight
 
 ```powershell
+if (Get-Command deactivate -ErrorAction SilentlyContinue) { deactivate }
 conda activate three-network-ddpg
 python --version
+python -c "import os, sys; print(sys.executable); print(sys.prefix); print(os.environ.get('CONDA_DEFAULT_ENV')); print(os.environ.get('VIRTUAL_ENV'))"
 python -m pip show three-network-ddpg
 git rev-parse HEAD
 git status --short --branch
@@ -37,6 +39,8 @@ three-network-ddpg experiment plot $StageA --metric evaluation_return_mean
 three-network-ddpg experiment plot $StageA --metric shared_squared_error
 ```
 
+`evaluation_return_mean` writes one readable per-variant SVG and `comparison-evaluation_return_mean.svg`. Use the comparison figure for visual comparisons: it places all compatible variants on one shared pair of absolute axes. Per-variant axes are intentionally auto-scaled for local readability and must not be used to compare magnitudes across variants. Mechanism metrics do not create cross-algorithm comparison figures because they are undefined for DDPG variants.
+
 Stop and inspect every Stage A artifact and status before considering Stage B. If a foreground run must be stopped, press `Ctrl+C` once and wait for it to return. The attempt is marked `interrupted`; do not delete it. Resume only retryable states with:
 
 ```powershell
@@ -54,6 +58,7 @@ Stage B has three paired seeds (`11`, `22`, `33`) for standard DDPG, DDPG withou
 $StageB = "experiments/manifests/pendulum_pilot_01_stage_b.yaml"
 three-network-ddpg experiment validate $StageB
 three-network-ddpg experiment plan $StageB
+three-network-ddpg experiment count $StageB
 ```
 
 Only after Stage A is complete and inspected, manually launch Stage B:
@@ -66,6 +71,8 @@ three-network-ddpg experiment plot $StageB --metric evaluation_return_mean
 three-network-ddpg experiment plot $StageB --metric shared_squared_error
 three-network-ddpg experiment plot $StageB --metric q_absolute_mean
 ```
+
+The evaluation-return command also writes `comparison-evaluation_return_mean.svg`, the only cross-algorithm comparison figure. It uses shared absolute axes; mechanism-metric plots remain per-variant because those metrics are not defined for DDPG baselines.
 
 `normalized_auc` is a report summary rather than a time-series plot metric; inspect it in `reports/aggregate.json`. For an interruption, keep the attempt, inspect `status`, and run `three-network-ddpg experiment resume $StageB`. Stop and inspect all Stage B results before running Stage C.
 
@@ -112,6 +119,8 @@ Get-Content "$StageRoot/reports/aggregate.json"
 Collect these exact artifacts for later analysis: `manifest.lock.json`, `manifest.source.json`, `matrix.json`, every run's `run_spec.json`, `resolved_config.yaml`, `status.json`, every attempt's `STARTED.json`, `metadata.json`, `metrics.jsonl`, `summary.json`, `checkpoint.pt` when present, and terminal `COMPLETED.json`, `FAILED.json`, `DIVERGENT.json`, `NON_FINITE.json`, or `INTERRUPTED.json` markers. Also collect `reports/aggregate.json`, `reports/plots/index.json`, and all generated SVG figures.
 
 The current runner writes append-safe `metrics.jsonl`; it does **not** produce CSV files or TensorBoard events with these manifests (`tracking.csv_jsonl=true`, `tensorboard=false`). Do not invent or expect CSV files. Failed, divergent, non-finite, interrupted, and incomplete statuses are part of the report and must be retained.
+
+Each SVG labels both axes, shows numeric ticks and recorded-observation markers, and records successful-seed and run-state counts. A confidence interval is drawn only with at least two successful seeds; `n=1` explicitly says that a confidence interval is unavailable.
 
 ## Runtime estimate before Stage B or C
 

@@ -112,3 +112,94 @@ def test_aggregation_retains_failures_nonfinite_and_plots_seed_traces(tmp_path: 
     svg = paths[0].read_text(encoding="utf-8")
     assert 'stroke-opacity="0.22"' in svg
     assert "failed=1" in svg and "divergent=1" in svg and "non_finite=1" in svg
+
+
+def _plot_variant(curves: list[list[tuple[int, float]]], *, metric: str = "evaluation_return_mean") -> dict:
+    aggregate = []
+    for index, step in enumerate(curves[0]):
+        values = [curve[index][1] for curve in curves]
+        aggregate.append(
+            {
+                "step": step[0],
+                "mean": sum(values) / len(values),
+                "confidence_interval": [min(values), max(values)] if len(curves) > 1 else None,
+            }
+        )
+    return {
+        "counts": {
+            "completed_runs": len(curves),
+            "divergent_runs": 1,
+            "failed_runs": 1,
+            "incomplete_runs": 0,
+            "interrupted_runs": 0,
+            "non_finite_runs": 1,
+        },
+        "metrics": {
+            metric: {
+                "aggregate": aggregate,
+                "individual_runs": [
+                    {"points": [{"step": step, "value": value} for step, value in curve]} for curve in curves
+                ],
+            }
+        },
+    }
+
+
+def test_plots_are_readable_shared_scale_and_honest_about_seed_count(tmp_path: Path) -> None:
+    curves = [[(500, -1700.0), (1000, -1300.0), (2000, -900.0)]]
+    report = {
+        "variants": {
+            "ddpg-pipeline-smoke": _plot_variant(curves),
+            "ddpg-no-target-actor-pipeline-smoke": _plot_variant(
+                [[(500, -1800.0), (1000, -1500.0), (2000, -1200.0)]]
+            ),
+            "three-network-shared-error-pipeline-smoke": _plot_variant(
+                [[(500, -1100.0), (1000, -1400.0), (2000, -1600.0)]]
+            ),
+        }
+    }
+    plots = tmp_path / "plots"
+    paths = plot_report(report, plots)
+    assert len(paths) == 4
+    comparison = plots / "comparison-evaluation_return_mean.svg"
+    svg = comparison.read_text(encoding="utf-8")
+    assert "Environment steps" in svg and "Evaluation return" in svg
+    assert ">-" in svg and 'viewBox="0 0 1120 800"' in svg
+    assert svg.count('font-size="12"') >= 4 and svg.count("<circle") == 9
+    assert 'y="766"' in svg
+    assert "DDPG without target actor" in svg
+    assert "Three-network shared-error sequential" in svg
+    assert "n=1; CI unavailable (requires n&gt;=2)" in svg
+    assert "completed=1, failed=1, divergent=1, non_finite=1" in svg
+    assert "confidence-band" not in svg
+    plot_report(report, plots)
+    assert svg == comparison.read_text(encoding="utf-8")
+
+    mechanism_report = {
+        "variants": {
+            variant_id: _plot_variant(curves, metric="shared_squared_error")
+            for variant_id in report["variants"]
+        }
+    }
+    mechanism_paths = plot_report(mechanism_report, tmp_path / "mechanism", metric="shared_squared_error")
+    assert len(mechanism_paths) == 3
+    assert not (tmp_path / "mechanism" / "comparison-shared_squared_error.svg").exists()
+
+
+def test_multi_seed_plot_has_faint_seed_curves_and_confidence_band(tmp_path: Path) -> None:
+    report = {
+        "variants": {
+            "v": _plot_variant(
+                [
+                    [(500, -1600.0), (1000, -1200.0), (2000, -1000.0)],
+                    [(500, -1700.0), (1000, -1300.0), (2000, -1100.0)],
+                ]
+            )
+        }
+    }
+    path = plot_report(report, tmp_path / "plots")[0]
+    svg = path.read_text(encoding="utf-8")
+    assert svg.count('class="seed-curve"') == 2
+    assert 'stroke-opacity="0.22"' in svg
+    assert 'class="confidence-band"' in svg
+    assert "n=2; 95% CI" in svg
