@@ -1,0 +1,103 @@
+# Filled from experiments/templates/experiment_plan.yaml. This is a pilot plan, not a runnable manifest.
+schema_version: 2
+name: pendulum-pilot-01
+description: Prepared manual Pendulum-v1 development pilot. No stage has been executed or is confirmatory evidence.
+defaults:
+  environment: Pendulum-v1
+  environment_wrappers: []
+  device: cpu
+  workers: 1
+  output_root: runs/pendulum-pilot-01
+training_seeds: [11, 22, 33]
+evaluation_seeds: [1001, 1002, 1003, 1004, 1005]
+held_out_confirmatory_training_seeds: [101, 202, 303, 404, 505, 606, 707, 808, 909, 1010]
+analysis:
+  primary_control_metrics: [evaluation_return_mean, normalized_auc]
+  mechanism_metrics: [shared_squared_error, signed_residual_mean, absolute_residual_mean, current_agreement_error, next_agreement_error, q_absolute_mean, gradient-alignment diagnostics]
+  reliability_metrics: [non_finite_runs, divergent_runs, failed_runs, interrupted_runs, incomplete_runs, per-seed variance]
+  last_k: 5
+  bootstrap_samples: 2000
+  confidence_level: 0.95
+  bootstrap_seed: 20261001
+fixed_conditions:
+  environment: Pendulum-v1
+  wrappers: []
+  observation_normalization: false
+  reward_scale: 1.0
+  action_bounds: environment
+  action_rescaling: true
+  clip_actions: true
+  bootstrap_on_truncation: true
+  gamma: 0.99
+  hidden_layers: [128, 128]
+  optimizer: adam
+  actor_learning_rate: 0.0003
+  critic_one_learning_rate: 0.001
+  critic_two_learning_rate: 0.001
+  gradient_clip_norm: null
+  exploration_noise: {mode: gaussian, standard_deviation: 0.1, clip: null}
+  replay_capacity: 10000
+  warmup_steps: 256
+  batch_size: 64
+  actor_update_delay: 1
+  device: cpu
+  workers: 1
+  tracking: {csv_jsonl: true, tensorboard: false, wandb: false}
+  checkpoint_policy: One final checkpoint.pt is written only when an attempt reaches its terminal path.
+  termination_policy: terminated transitions never bootstrap; truncations bootstrap because bootstrap_on_truncation=true.
+unavoidable_algorithm_specific_differences:
+  - Standard DDPG retains target actor and target critic.
+  - DDPG without target actor retains only a target critic.
+  - The proposed three-network method has no target actor or target critic and uses a next-state actor objective.
+  - DDPG baselines use their implemented current-state actor objective.
+stages:
+  - id: stage-a
+    manifest: experiments/manifests/pendulum_pilot_01_stage_a.yaml
+    labels: [pilot, pipeline_smoke]
+    purpose: Verify Pendulum collection, updates, fixed-seed evaluation, checkpointing, JSONL metrics, status markers, aggregation, and SVG plotting without interpreting performance.
+    hypothesis: Complete auditable artifacts can be produced for every implemented comparison variant.
+    variants: [ddpg-pipeline-smoke, ddpg-no-target-actor-pipeline-smoke, three-network-shared-error-pipeline-smoke]
+    training_seeds: [11]
+    evaluation_seeds: [1001, 1002, 1003, 1004, 1005]
+    environment_steps_per_run: 2000
+    evaluation_schedule: Every 500 training environment steps; 5 deterministic evaluation episodes per evaluation.
+    workload: {variants: 3, seeds_per_variant: 1, planned_runs: 3, total_training_environment_steps: 6000, scheduled_evaluation_episodes_per_run: 20, total_scheduled_evaluation_episodes: 60, workers: 1, execution: sequential, output: runs/pendulum-pilot-01/pendulum-pilot-01-stage-a}
+    gate_to_next_stage: Inspect every status, completion marker, metadata, metrics JSONL, aggregate report, and SVG plot before considering Stage B.
+  - id: stage-b
+    manifest: experiments/manifests/pendulum_pilot_01_stage_b.yaml
+    labels: [pilot, mechanism_pilot]
+    purpose: Compare the two DDPG baselines with the target-free shared-error sequential reference under paired development seeds.
+    hypothesis: Mechanism and reliability diagnostics can be inspected alongside control metrics without a superiority claim.
+    variants: [ddpg, ddpg-no-target-actor, three-network-shared-error]
+    training_seeds: [11, 22, 33]
+    evaluation_seeds: [1001, 1002, 1003, 1004, 1005]
+    environment_steps_per_run: 20000
+    evaluation_schedule: Every 1000 training environment steps; 5 deterministic evaluation episodes per evaluation.
+    workload: {variants: 3, seeds_per_variant: 3, planned_runs: 9, total_training_environment_steps: 180000, scheduled_evaluation_episodes_per_run: 100, total_scheduled_evaluation_episodes: 900, workers: 1, execution: sequential, output: runs/pendulum-pilot-01/pendulum-pilot-01-stage-b}
+    gate_to_next_stage: Inspect all Stage B status, failure, reliability, control, and mechanism reports before executing Stage C.
+  - id: stage-c
+    manifest: experiments/manifests/pendulum_pilot_01_stage_c.yaml
+    labels: [pilot, agreement_pilot]
+    purpose: Compare only the four agreement modes while holding the three-network conditions fixed.
+    hypothesis: Agreement-mode diagnostics can be compared under paired development seeds with no alpha sweep.
+    variants: [three-network-none, three-network-current, three-network-next, three-network-both]
+    documented_coefficients: {none: {alpha: 0.0, alpha_prime: 0.0}, current: {alpha: 0.0, alpha_prime: 0.1}, next: {alpha: 0.1, alpha_prime: 0.0}, both: {alpha: 0.1, alpha_prime: 0.1}}
+    training_seeds: [11, 22, 33]
+    evaluation_seeds: [1001, 1002, 1003, 1004, 1005]
+    environment_steps_per_run: 20000
+    evaluation_schedule: Every 1000 training environment steps; 5 deterministic evaluation episodes per evaluation.
+    workload: {variants: 4, seeds_per_variant: 3, planned_runs: 12, total_training_environment_steps: 240000, scheduled_evaluation_episodes_per_run: 100, total_scheduled_evaluation_episodes: 1200, workers: 1, execution: sequential, output: runs/pendulum-pilot-01/pendulum-pilot-01-stage-c}
+    gate_to_next_stage: No further stage is authorized by this plan; review all results without a convergence, superiority, or paper-level claim.
+preregistration:
+  failure_and_divergence_definitions: A non_finite status records a non-finite metric or finite-value violation; divergent records numerical floating-point or overflow failure; failed records another exception; interrupted records Ctrl+C; incomplete has never started. Every status remains in the report.
+  stopping_rules: Execute the fixed environment-step budget for each manually started attempt. Do not stop, extend, or select by intermediate return.
+  selection_rules: Do not choose a variant from its best single seed. Do not consume held-out confirmatory seeds. Stage B must be inspected before Stage C. Any algorithm-code defect invalidates affected runs and requires a separate fix branch before clean reruns.
+  forbidden_interpretations:
+    - Lower shared TD error alone does not imply a better policy.
+    - Three-network mechanism metrics are undefined for DDPG variants; do not construct proxy values or compare them directly across those algorithms.
+    - This pilot cannot establish convergence, superiority, stability, novelty, or paper-level evidence.
+    - Validation-batch metrics are monitoring-only and never control guarded-update acceptance.
+    - l2_y_z is excluded; it is not an available scientific objective.
+runtime_estimation:
+  method: Run Stage A once, read wall_time_seconds and environment_steps_per_second from each completed attempt, use a conservative low observed throughput, then estimate Stage B or C wall time as total planned training steps divided by that throughput plus separately observed evaluation and setup overhead.
+  caveat: Do not infer an exact runtime from this plan; hardware, library versions, evaluation episode length, and interruptions can change throughput.

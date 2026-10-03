@@ -1,0 +1,157 @@
+schema_version: 2
+name: pendulum-pilot-01-stage-c
+description: Pilot agreement study on Pendulum-v1; bounded development evidence only, not confirmatory evidence.
+defaults:
+  environment: pendulum_v1
+  experiment: three_network_core
+training_seeds: [11, 22, 33]
+evaluation_seeds: [1001, 1002, 1003, 1004, 1005]
+variants:
+  - id: three-network-none
+    algorithm: three_network_ddpg
+    overrides:
+      - experiment.total_steps=20000
+      - experiment.warmup_steps=256
+      - experiment.batch_size=64
+      - experiment.replay_capacity=10000
+      - experiment.evaluation_frequency=1000
+      - experiment.evaluation_episodes=5
+      - experiment.bootstrap_on_truncation=true
+      - experiment.clip_actions=true
+      - algorithm.hidden_layers=[128,128]
+      - algorithm.gamma=0.99
+      - algorithm.actor_learning_rate=0.0003
+      - algorithm.critic_one_learning_rate=0.001
+      - algorithm.critic_two_learning_rate=0.001
+      - algorithm.exploration_noise.mode=gaussian
+      - algorithm.exploration_noise.standard_deviation=0.1
+      - algorithm.exploration_noise.clip=null
+      - algorithm.action_rescaling=true
+      - algorithm.gradient_clip_norm=null
+      - algorithm.agreement_mode=none
+      - algorithm.alpha=0.0
+      - algorithm.alpha_prime=0.0
+      - algorithm.beta_regularizer.mode=none
+      - algorithm.beta_regularizer.coefficient=0.0
+      - algorithm.update_schedule=sequential
+      - algorithm.actor_state_source=next
+      - algorithm.critic_initialization=independent
+      - algorithm.actor_update_delay=1
+      - algorithm.guard.validation_batch=false
+      - algorithm.device=cpu
+  - id: three-network-current
+    algorithm: three_network_ddpg
+    overrides:
+      - experiment.total_steps=20000
+      - experiment.warmup_steps=256
+      - experiment.batch_size=64
+      - experiment.replay_capacity=10000
+      - experiment.evaluation_frequency=1000
+      - experiment.evaluation_episodes=5
+      - experiment.bootstrap_on_truncation=true
+      - experiment.clip_actions=true
+      - algorithm.hidden_layers=[128,128]
+      - algorithm.gamma=0.99
+      - algorithm.actor_learning_rate=0.0003
+      - algorithm.critic_one_learning_rate=0.001
+      - algorithm.critic_two_learning_rate=0.001
+      - algorithm.exploration_noise.mode=gaussian
+      - algorithm.exploration_noise.standard_deviation=0.1
+      - algorithm.exploration_noise.clip=null
+      - algorithm.action_rescaling=true
+      - algorithm.gradient_clip_norm=null
+      - algorithm.agreement_mode=current
+      - algorithm.alpha=0.0
+      - algorithm.alpha_prime=0.1
+      - algorithm.beta_regularizer.mode=none
+      - algorithm.beta_regularizer.coefficient=0.0
+      - algorithm.update_schedule=sequential
+      - algorithm.actor_state_source=next
+      - algorithm.critic_initialization=independent
+      - algorithm.actor_update_delay=1
+      - algorithm.guard.validation_batch=false
+      - algorithm.device=cpu
+  - id: three-network-next
+    algorithm: three_network_ddpg
+    overrides:
+      - experiment.total_steps=20000
+      - experiment.warmup_steps=256
+      - experiment.batch_size=64
+      - experiment.replay_capacity=10000
+      - experiment.evaluation_frequency=1000
+      - experiment.evaluation_episodes=5
+      - experiment.bootstrap_on_truncation=true
+      - experiment.clip_actions=true
+      - algorithm.hidden_layers=[128,128]
+      - algorithm.gamma=0.99
+      - algorithm.actor_learning_rate=0.0003
+      - algorithm.critic_one_learning_rate=0.001
+      - algorithm.critic_two_learning_rate=0.001
+      - algorithm.exploration_noise.mode=gaussian
+      - algorithm.exploration_noise.standard_deviation=0.1
+      - algorithm.exploration_noise.clip=null
+      - algorithm.action_rescaling=true
+      - algorithm.gradient_clip_norm=null
+      - algorithm.agreement_mode=next
+      - algorithm.alpha=0.1
+      - algorithm.alpha_prime=0.0
+      - algorithm.beta_regularizer.mode=none
+      - algorithm.beta_regularizer.coefficient=0.0
+      - algorithm.update_schedule=sequential
+      - algorithm.actor_state_source=next
+      - algorithm.critic_initialization=independent
+      - algorithm.actor_update_delay=1
+      - algorithm.guard.validation_batch=false
+      - algorithm.device=cpu
+  - id: three-network-both
+    algorithm: three_network_ddpg
+    overrides:
+      - experiment.total_steps=20000
+      - experiment.warmup_steps=256
+      - experiment.batch_size=64
+      - experiment.replay_capacity=10000
+      - experiment.evaluation_frequency=1000
+      - experiment.evaluation_episodes=5
+      - experiment.bootstrap_on_truncation=true
+      - experiment.clip_actions=true
+      - algorithm.hidden_layers=[128,128]
+      - algorithm.gamma=0.99
+      - algorithm.actor_learning_rate=0.0003
+      - algorithm.critic_one_learning_rate=0.001
+      - algorithm.critic_two_learning_rate=0.001
+      - algorithm.exploration_noise.mode=gaussian
+      - algorithm.exploration_noise.standard_deviation=0.1
+      - algorithm.exploration_noise.clip=null
+      - algorithm.action_rescaling=true
+      - algorithm.gradient_clip_norm=null
+      - algorithm.agreement_mode=both
+      - algorithm.alpha=0.1
+      - algorithm.alpha_prime=0.1
+      - algorithm.beta_regularizer.mode=none
+      - algorithm.beta_regularizer.coefficient=0.0
+      - algorithm.update_schedule=sequential
+      - algorithm.actor_state_source=next
+      - algorithm.critic_initialization=independent
+      - algorithm.actor_update_delay=1
+      - algorithm.guard.validation_batch=false
+      - algorithm.device=cpu
+execution:
+  output_root: runs/pendulum-pilot-01
+  workers: 1
+analysis:
+  last_k: 5
+  bootstrap_samples: 2000
+  confidence_level: 0.95
+  bootstrap_seed: 20261001
+preregistration:
+  stage: pilot
+  stage_type: agreement_pilot
+  hypothesis: Current, next, and both agreement modes can be compared against the shared-error reference under paired development seeds; no convergence or superiority claim is tested.
+  fixed_factors: [Pendulum-v1, wrappers, action handling, CPU, one worker, training seeds, evaluation seeds, network width, learning rates, replay, warmup, exploration, evaluation schedule, budget, sequential schedule, beta disabled, next-state actor objective, independent critics, no guard]
+  varied_factors: [agreement_mode, documented agreement coefficients]
+  primary_metrics: [evaluation_return_mean, normalized_auc]
+  mechanism_metrics: [shared_squared_error, signed_residual_mean, absolute_residual_mean, current_agreement_error, next_agreement_error, q_absolute_mean, actor_gradient_norm, critic_one_gradient_norm, critic_two_gradient_norm]
+  reliability_metrics: [non_finite_runs, divergent_runs, failed_runs, interrupted_runs, incomplete_runs]
+  failure_and_divergence_rules: Preserve completed, interrupted, failed, divergent, and non_finite statuses; invalid algorithm-code results require a separate fix branch and clean reruns.
+  stopping_rules: Fixed at 20000 training environment steps per run; no outcome-dependent stopping.
+  candidate_selection_rules: Execute only after Stage B inspection; no alpha sweep and no best-single-seed selection.

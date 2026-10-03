@@ -18,3 +18,5 @@
 - Add the experimental `ddpg_no_target_actor` baseline with detached online-actor bootstrapping through a target critic, target-critic-only Polyak updates, distinct configuration and checkpoint identity, and deterministic and Pendulum smoke coverage. Stability remains unestablished pending multi-seed studies.
 
 - Add versioned experiment manifests, stable run identities, paired training and fixed evaluation seeds, crash-safe attempts and resume, explicit completion/failure states, failure-aware bootstrap aggregation, per-seed SVG plots, bounded smoke infrastructure, and PowerShell/Bash operating instructions. No scientific result is claimed.
+
+- Prepare a manually launched, three-stage Pendulum-v1 development pilot with separated manifests, paired development seeds, held-out confirmatory seeds, stage gates, workload accounting, focused tests, and a PowerShell execution guide. No Pendulum training is run by this preparation change.

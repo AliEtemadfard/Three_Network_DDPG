@@ -47,3 +47,7 @@ Version 2 manifests pair the same ordered training seeds across every variant an
 Terminal states are `completed`, `interrupted`, `failed`, `divergent`, and `non_finite`. Aggregation includes every planned run and its failure reason, but computes numerical summaries only from completed runs with finite metrics. Reports include counts, completion rate, mean, sample standard deviation, median, IQR, bootstrap confidence intervals, per-seed curves, last-k return, and normalized learning-curve area. A confidence interval is omitted when fewer than two completed seeds contribute. Curves use the union of environment-step coordinates, interpolate only within each run's observed range, and never extrapolate.
 
 The guarded variant's independent validation batch is monitoring-only. It may be logged and aggregated, but it never controls acceptance or rejection.
+
+## Prepared Pendulum development pilot
+
+`experiments/manifests/pendulum_pilot_01_stage_a.yaml`, `stage_b.yaml`, and `stage_c.yaml` are separate manually launched Pendulum-v1 pilot stages. They share development seeds and fixed evaluation seeds while preserving the confirmatory seed set. The frozen plan records workload and stage gates in [Pendulum Pilot 01](../manual_pendulum_pilot_01.md). Preparation and manifest planning do not constitute execution or scientific evidence.
