@@ -131,13 +131,16 @@ def test_stage_a_pipeline_smoke_reaches_learning_and_evaluation_lifecycle() -> N
         assert config.experiment.batch_size == 64
         assert config.experiment.warmup_steps >= config.experiment.batch_size
         assert config.experiment.evaluation_frequency == 500
-        assert tuple(
-            range(
-                config.experiment.evaluation_frequency,
-                config.experiment.total_steps + 1,
-                config.experiment.evaluation_frequency,
+        assert (
+            tuple(
+                range(
+                    config.experiment.evaluation_frequency,
+                    config.experiment.total_steps + 1,
+                    config.experiment.evaluation_frequency,
+                )
             )
-        ) == evaluation_steps
+            == evaluation_steps
+        )
         assert config.experiment.evaluation_episodes == len(EVALUATION_SEEDS)
 
 
