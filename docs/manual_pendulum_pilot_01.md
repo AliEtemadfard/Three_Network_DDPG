@@ -126,3 +126,5 @@ Add a buffer for five-episode evaluations, setup, checkpointing, and interruptio
 ## Interpretation boundary
 
 Primary control metrics are evaluation return and normalized AUC. Mechanism metrics include shared residual/error, critic agreement, Q-value scale, and defined gradient-alignment diagnostics. Reliability metrics include non-finite failures, divergence, variance, and incomplete runs. A lower shared TD error alone does not imply a better policy. Do not select the best single seed, claim convergence or superiority, consume confirmatory seeds, or present this pilot as paper-level evidence. `l2_y_z` remains excluded.
+
+Three-network mechanism metrics are undefined for the DDPG variants. A mechanism plot can therefore have no DDPG series; do not create proxy values or treat those diagnostics as directly comparable across algorithms. Compare all variants on the primary control and reliability metrics instead.

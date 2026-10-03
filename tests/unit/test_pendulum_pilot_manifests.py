@@ -14,6 +14,7 @@ from three_network_ddpg.protocol.manifest import (
     expand_manifest,
     load_manifest,
 )
+from three_network_ddpg.protocol.storage import study_directory
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 MANIFEST_DIRECTORY = REPOSITORY / "experiments" / "manifests"
@@ -103,6 +104,43 @@ def test_pilot_seeds_are_disjoint_from_evaluation_and_confirmatory_training() ->
     assert set(DEVELOPMENT_TRAINING_SEEDS).isdisjoint(confirmatory.training_seeds)
 
 
+def test_stage_identities_isolate_output_directories_and_run_ids() -> None:
+    manifests = {stage: _manifest(stage) for stage in STAGES}
+    planned = {stage: expand_manifest(manifest) for stage, manifest in manifests.items()}
+    directories = {stage: study_directory(manifest) for stage, manifest in manifests.items()}
+
+    assert len(set(directories.values())) == len(directories)
+    assert directories["a"].parent == directories["b"].parent == directories["c"].parent
+    for left in STAGES:
+        for right in STAGES:
+            if left < right:
+                left_ids = {run.run_id for run in planned[left]}
+                right_ids = {run.run_id for run in planned[right]}
+                assert left_ids.isdisjoint(right_ids)
+
+
+def test_stage_a_pipeline_smoke_reaches_learning_and_evaluation_lifecycle() -> None:
+    planned = expand_manifest(_manifest("a"))
+    evaluation_steps = (500, 1000, 1500, 2000)
+
+    for run in planned:
+        config = run.config
+        assert config.experiment.warmup_steps == 256
+        assert config.experiment.total_steps == 2000
+        assert config.experiment.total_steps - config.experiment.warmup_steps == 1744
+        assert config.experiment.batch_size == 64
+        assert config.experiment.warmup_steps >= config.experiment.batch_size
+        assert config.experiment.evaluation_frequency == 500
+        assert tuple(
+            range(
+                config.experiment.evaluation_frequency,
+                config.experiment.total_steps + 1,
+                config.experiment.evaluation_frequency,
+            )
+        ) == evaluation_steps
+        assert config.experiment.evaluation_episodes == len(EVALUATION_SEEDS)
+
+
 def test_stage_b_has_only_the_required_baselines_and_target_free_reference() -> None:
     planned = expand_manifest(_manifest("b"))
     ddpg = _seed_run(planned, "ddpg")
@@ -163,8 +201,9 @@ def test_stage_c_varies_only_agreement_mode_and_documented_coefficients() -> Non
         "algorithm.actor_state_source",
         "algorithm.critic_initialization",
         "algorithm.actor_update_delay",
-        "algorithm.guard.validation_batch",
+        "algorithm.guard",
         "algorithm.device",
+        "experiment.tracking",
     )
     snapshots: list[dict[str, Any]] = []
     for variant_id, (mode, alpha, alpha_prime) in expected_coefficients.items():

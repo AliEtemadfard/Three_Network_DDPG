@@ -94,6 +94,7 @@ preregistration:
   selection_rules: Do not choose a variant from its best single seed. Do not consume held-out confirmatory seeds. Stage B must be inspected before Stage C. Any algorithm-code defect invalidates affected runs and requires a separate fix branch before clean reruns.
   forbidden_interpretations:
     - Lower shared TD error alone does not imply a better policy.
+    - Three-network mechanism metrics are undefined for DDPG variants; do not construct proxy values or compare them directly across those algorithms.
     - This pilot cannot establish convergence, superiority, stability, novelty, or paper-level evidence.
     - Validation-batch metrics are monitoring-only and never control guarded-update acceptance.
     - l2_y_z is excluded; it is not an available scientific objective.
