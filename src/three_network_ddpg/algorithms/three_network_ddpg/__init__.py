@@ -7,6 +7,7 @@ from .implementation import (
     ThreeNetworkSettings,
     agreement_error,
     beta_regularizer,
+    q2_td_residual,
     shared_residual,
     shared_squared_error,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "ThreeNetworkSettings",
     "agreement_error",
     "beta_regularizer",
+    "q2_td_residual",
     "shared_residual",
     "shared_squared_error",
 ]

@@ -46,8 +46,14 @@ For critics and actor scope, rejection restores only the guarded proposal becaus
 
 Current agreement compares Z1 with detached Y during Critic Two's update. Next agreement compares Y1 with detached Z during Critic One's update. Modes none, current, next, and both select these terms without changing the stop gradient matrix.
 
+The default `shared_error` critic objective preserves the original implementation and all earlier
+results. The opt-in `separate_td` reconstruction is sequential-only: Critic Two regresses its current
+prediction Z1 against the detached target `r + gamma * mask * Z`, then Critic One recomputes Z after
+that update and regresses Y against the same-form detached target. Agreement terms retain their
+existing current and next inputs. No critic gradient flows through Z as a bootstrap value.
+
 Beta modes are none, experimental linear_y, and l2_y. l2_y_z is unavailable because the current stop-gradient contract does not define symmetric Z regularization; any symmetric objective requires advisor approval and a separate name. Exact formulas are recorded in [notation](notation.md).
 
-Every update records the residual, shared error, agreement errors, output statistics, component losses, and gradient norms. Guarded updates also record acceptance, rejection, retry count, last executed candidate scale and effective learning rate, batch error before and after, committed error, and optional validation change. At diagnostic_frequency, separate autograd calls measure each critic objective's alignment with its shared error gradient and the actor objective's interaction with the shared error gradient. Diagnostics never replace training gradients.
+Every update records the shared residual, Critic Two's own TD residual, both squared errors, agreement errors, output statistics, component losses, and gradient norms. Guarded updates also record acceptance, rejection, retry count, last executed candidate scale and effective learning rate, batch error before and after, committed error, and optional validation change. At diagnostic_frequency, separate autograd calls measure each critic objective's alignment with its shared error gradient and the actor objective's interaction with the shared error gradient. Diagnostics never replace training gradients.
 
 The next state actor objective remains the reconstructed default; current state input is an executable ablation. Critics remain independently initialized, the actor updates every learner step, and Adam is the implemented optimizer. See [controlled implementation](three_network_core.md). These mechanics establish no convergence or performance claim.

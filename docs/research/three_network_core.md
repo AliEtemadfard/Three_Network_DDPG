@@ -12,8 +12,21 @@ For every replay batch, with a_next = actor(s_next) detached during critic updat
 - Z = critic_two(s_next, a_next)
 - delta = r + gamma * bootstrap_mask * Z - Y
 - shared_squared_error = 0.5 * mean(delta ** 2)
+- delta_prime = r + gamma * bootstrap_mask * Z - Z1
+- q2_td_squared_error = 0.5 * mean(delta_prime ** 2)
 
 Critic Two differentiates through Z while treating Y as fixed. Critic One differentiates through Y while treating Z as fixed. The actor minimizes -mean(critic_two(actor_state, actor(actor_state))); actor_state defaults to s_next and can be set to s. Both critics are frozen during the actor backward pass, while the action to actor path remains connected.
+
+That paragraph describes the default `shared_error` critic objective. It remains unchanged. The
+opt-in `separate_td` objective is an experimental reconstruction with detached target
+`t = stop_gradient(r + gamma * bootstrap_mask * Z)`. It uses:
+
+- Critic One: `0.5 * mean((Y - t) ** 2) + alpha * next_agreement`.
+- Critic Two: `0.5 * mean((Z1 - t) ** 2) + alpha_prime * current_agreement`.
+
+Critic Two's TD term therefore differentiates only through its current-input prediction Z1. During
+the sequential Critic One phase, Z is freshly recomputed after the Critic Two optimizer step and is
+then detached. Beta must remain disabled for this objective.
 
 ## Agreement ablations
 
@@ -50,7 +63,7 @@ When validation_batch is enabled, the trainer samples a second replay batch. Its
 
 ## Diagnostics
 
-Each learner update logs signed and absolute residual means, shared squared error, both raw agreement errors, component losses, gradient norms, actor objective, and statistics for Y, Y1, Z1, and Z.
+Each learner update logs signed and absolute means for both delta and delta_prime, their squared errors, both raw agreement errors, component losses, gradient norms, actor objective, and statistics for Y, Y1, Z1, and Z.
 
 Guard metrics include accepted and rejected indicators and totals, retry count, last executed candidate learning rate and scale, update-batch error before and after, committed error after restoration or acceptance, and validation-batch change when configured.
 

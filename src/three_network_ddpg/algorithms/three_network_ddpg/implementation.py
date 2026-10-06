@@ -26,6 +26,7 @@ from ...core.interfaces import (
 
 AgreementMode = Literal["none", "current", "next", "both"]
 BetaMode = Literal["none", "linear_y", "l2_y"]
+CriticObjective = Literal["shared_error", "separate_td"]
 UpdateSchedule = Literal["sequential", "simultaneous", "guarded"]
 GuardScope = Literal["joint", "critics", "actor"]
 ActorStateSource = Literal["current", "next"]
@@ -45,6 +46,7 @@ class ThreeNetworkSettings:
     critic_two_learning_rate: float = 1e-3
     optimizer_epsilon: float = 1e-8
     weight_decay: float = 0.0
+    critic_objective: CriticObjective = "shared_error"
     agreement_mode: AgreementMode = "none"
     alpha: float = 0.0
     alpha_prime: float = 0.0
@@ -87,6 +89,8 @@ class ThreeNetworkSettings:
             raise ValueError("actor and critic learning rates must be positive")
         if self.optimizer_epsilon <= 0 or self.weight_decay < 0:
             raise ValueError("optimizer epsilon must be positive and weight decay nonnegative")
+        if self.critic_objective not in {"shared_error", "separate_td"}:
+            raise ValueError("unsupported critic_objective")
         if self.agreement_mode not in {"none", "current", "next", "both"}:
             raise ValueError("unsupported agreement_mode")
         if self.alpha < 0 or self.alpha_prime < 0:
@@ -109,6 +113,12 @@ class ThreeNetworkSettings:
             raise ValueError("an active beta mode requires a positive coefficient")
         if self.update_schedule not in {"sequential", "simultaneous", "guarded"}:
             raise ValueError("unsupported update_schedule")
+        if self.critic_objective == "separate_td" and self.update_schedule != "sequential":
+            raise ValueError("separate_td requires the sequential update schedule")
+        if self.critic_objective == "separate_td" and (
+            self.beta_mode != "none" or self.beta_coefficient != 0
+        ):
+            raise ValueError("separate_td requires beta regularization to be disabled")
         if self.actor_state_source not in {"current", "next"}:
             raise ValueError("actor_state_source must be current or next")
         if self.guard_scope not in {"joint", "critics", "actor"}:
@@ -175,6 +185,7 @@ class ThreeNetworkSettings:
             critic_two_learning_rate=float(algorithm_config["critic_two_learning_rate"]),
             optimizer_epsilon=float(algorithm_config["optimizer"]["epsilon"]),
             weight_decay=float(algorithm_config["optimizer"]["weight_decay"]),
+            critic_objective=str(algorithm_config["critic_objective"]),
             agreement_mode=str(algorithm_config["agreement_mode"]),
             alpha=float(algorithm_config["alpha"]),
             alpha_prime=float(algorithm_config["alpha_prime"]),
@@ -275,6 +286,17 @@ def shared_squared_error(delta: torch.Tensor) -> torch.Tensor:
     return 0.5 * delta.square().mean()
 
 
+def q2_td_residual(
+    rewards: torch.Tensor,
+    bootstrap_mask: torch.Tensor,
+    z_next: torch.Tensor,
+    z_current: torch.Tensor,
+    gamma: float,
+) -> torch.Tensor:
+    """Return D-prime for Critic Two's current-input TD regression."""
+    return shared_residual(rewards, bootstrap_mask, z_next, z_current, gamma)
+
+
 def agreement_error(left: torch.Tensor, right: torch.Tensor) -> torch.Tensor:
     if left.shape != right.shape:
         raise ValueError("agreement tensors must have matching shapes")
@@ -301,12 +323,14 @@ class _OutputSnapshot:
     z1: torch.Tensor
     z: torch.Tensor
     delta: torch.Tensor
+    delta_prime: torch.Tensor
 
 
 @dataclass(frozen=True, slots=True)
 class _PhaseResult:
     loss: float
     shared_loss: float
+    td_loss: float
     agreement_loss: float
     beta_loss: float
     gradient_norm: float
@@ -462,7 +486,14 @@ class ThreeNetworkDDPG(OffPolicyAlgorithm):
             z1 = self.critic_two(batch.observations, batch.actions)
             z = self.critic_two(batch.next_observations, next_actions)
             delta = shared_residual(batch.rewards, batch.bootstrap_mask, z, y, self.settings.gamma)
-        return _OutputSnapshot(y, y1, z1, z, delta)
+            delta_prime = q2_td_residual(
+                batch.rewards,
+                batch.bootstrap_mask,
+                z,
+                z1,
+                self.settings.gamma,
+            )
+        return _OutputSnapshot(y, y1, z1, z, delta, delta_prime)
 
     def _shared_error_value(self, batch: TransitionBatch) -> float:
         return float(shared_squared_error(self._snapshot(batch).delta).cpu())
@@ -492,10 +523,13 @@ class ThreeNetworkDDPG(OffPolicyAlgorithm):
         agreement: torch.Tensor,
         beta: torch.Tensor,
         gradients: Sequence[torch.Tensor],
+        *,
+        td: torch.Tensor | None = None,
     ) -> _PhaseResult:
         return _PhaseResult(
             loss=float(total.detach().cpu()),
             shared_loss=float(shared.detach().cpu()),
+            td_loss=float((shared if td is None else td).detach().cpu()),
             agreement_loss=float(agreement.detach().cpu()),
             beta_loss=float(beta.detach().cpu()),
             gradient_norm=_gradient_norm(gradients),
@@ -506,16 +540,34 @@ class ThreeNetworkDDPG(OffPolicyAlgorithm):
         next_actions = self._next_actions_detached(batch)
         with torch.no_grad():
             y_target = self.critic_one(batch.observations, batch.actions)
-        z = self.critic_two(batch.next_observations, next_actions)
-        z1 = self.critic_two(batch.observations, batch.actions)
+        z_next = self.critic_two(batch.next_observations, next_actions)
+        z_current = self.critic_two(batch.observations, batch.actions)
         shared = shared_squared_error(
-            shared_residual(batch.rewards, batch.bootstrap_mask, z, y_target, self.settings.gamma)
+            shared_residual(
+                batch.rewards,
+                batch.bootstrap_mask,
+                z_next,
+                y_target,
+                self.settings.gamma,
+            )
         )
-        current = agreement_error(z1, y_target) if self._uses_current_agreement() else shared.new_zeros(())
-        total = shared + self.settings.alpha_prime * current
+        target = (batch.rewards + self.settings.gamma * batch.bootstrap_mask * z_next).detach()
+        q2_td = shared_squared_error(z_current - target)
+        base_loss = q2_td if self.settings.critic_objective == "separate_td" else shared
+        current = (
+            agreement_error(z_current, y_target) if self._uses_current_agreement() else shared.new_zeros(())
+        )
+        total = base_loss + self.settings.alpha_prime * current
         parameters = tuple(self.critic_two.parameters())
         gradients = torch.autograd.grad(total, parameters)
-        result = self._phase_result(total, shared, current, shared.new_zeros(()), gradients)
+        result = self._phase_result(
+            total,
+            shared,
+            current,
+            shared.new_zeros(()),
+            gradients,
+            td=q2_td,
+        )
         _assign_gradients(parameters, gradients)
         self._clip_assigned_gradients(parameters)
         self.critic_two_optimizer.step()
@@ -860,7 +912,12 @@ class ThreeNetworkDDPG(OffPolicyAlgorithm):
             if self._uses_current_agreement()
             else critic_two_shared.new_zeros(())
         )
-        critic_two_objective = critic_two_shared + self.settings.alpha_prime * current
+        if self.settings.critic_objective == "separate_td":
+            q2_target = (batch.rewards + self.settings.gamma * batch.bootstrap_mask * z).detach()
+            critic_two_base = shared_squared_error(z1 - q2_target)
+        else:
+            critic_two_base = critic_two_shared
+        critic_two_objective = critic_two_base + self.settings.alpha_prime * current
         two_shared_gradients = torch.autograd.grad(
             critic_two_shared, critic_two_parameters, retain_graph=True
         )
@@ -921,6 +978,9 @@ class ThreeNetworkDDPG(OffPolicyAlgorithm):
             "signed_residual_mean": float(snapshot.delta.mean().cpu()),
             "absolute_residual_mean": float(snapshot.delta.abs().mean().cpu()),
             "shared_squared_error": float(shared_squared_error(snapshot.delta).cpu()),
+            "q2_signed_residual_mean": float(snapshot.delta_prime.mean().cpu()),
+            "q2_absolute_residual_mean": float(snapshot.delta_prime.abs().mean().cpu()),
+            "q2_td_squared_error": float(shared_squared_error(snapshot.delta_prime).cpu()),
             "current_agreement_error": float(agreement_error(snapshot.z1, snapshot.y).cpu()),
             "next_agreement_error": float(agreement_error(snapshot.y1, snapshot.z).cpu()),
             "beta_regularizer_value": float(
@@ -949,6 +1009,7 @@ class ThreeNetworkDDPG(OffPolicyAlgorithm):
             return
         values[f"{name}_loss"] = result.loss
         values[f"{name}_shared_loss"] = result.shared_loss
+        values[f"{name}_td_loss"] = result.td_loss
         values[f"{name}_agreement_loss"] = result.agreement_loss
         values[f"{name}_beta_loss"] = result.beta_loss
         values[f"{name}_gradient_norm"] = result.gradient_norm

@@ -22,3 +22,5 @@
 - Prepare a manually launched, three-stage Pendulum-v1 development pilot with separated manifests, paired development seeds, held-out confirmatory seeds, stage gates, workload accounting, focused tests, and a PowerShell execution guide. No Pendulum training is run by this preparation change.
 
 - Make experiment SVG plots quantitatively readable with labelled numeric axes, observation markers, explicit seed and confidence-interval status, failure counts, and a shared-scale evaluation-return comparison figure. Mechanism metrics remain per-variant when they are undefined for baseline algorithms.
+
+- Add an opt-in, sequential-only `separate_td` three-network critic objective that regresses both current predictions against a detached Critic Two bootstrap, preserves the original shared-error default, logs both residual systems, and includes a bounded manual Pendulum screening manifest. No screening run is executed by this change.

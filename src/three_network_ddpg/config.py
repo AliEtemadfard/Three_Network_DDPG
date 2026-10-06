@@ -12,6 +12,7 @@ from .algorithms.registry import get_algorithm_metadata
 _NAME = re.compile(r"[a-z][a-z0-9_]*\Z")
 _AGREEMENT = {"none", "current", "next", "both"}
 _BETA = {"none", "linear_y", "l2_y"}
+_CRITIC_OBJECTIVES = {"shared_error", "separate_td"}
 _SCHEDULE = {"simultaneous", "sequential", "alternating", "guarded"}
 
 
@@ -86,6 +87,8 @@ def validate_config(config: DictConfig) -> None:
     if algorithm.name == "three_network_ddpg":
         if "target_networks" in algorithm:
             errors.append("proposed main variant must not define target networks")
+        if algorithm.critic_objective not in _CRITIC_OBJECTIVES:
+            errors.append("three-network critic objective is invalid")
         if algorithm.agreement_mode == "none" and (algorithm.alpha != 0 or algorithm.alpha_prime != 0):
             errors.append("agreement mode none requires zero alpha coefficients")
         if algorithm.agreement_mode == "current" and algorithm.alpha != 0:
@@ -100,6 +103,10 @@ def validate_config(config: DictConfig) -> None:
             errors.append("an active beta mode requires a positive coefficient")
         if algorithm.update_schedule not in {"sequential", "simultaneous", "guarded"}:
             errors.append("three-network updates must be sequential, simultaneous, or guarded")
+        if algorithm.critic_objective == "separate_td" and algorithm.update_schedule != "sequential":
+            errors.append("separate_td requires the sequential update schedule")
+        if algorithm.critic_objective == "separate_td" and (beta_mode != "none" or beta_coefficient != 0):
+            errors.append("separate_td requires beta regularization to be disabled")
         if algorithm.critic_initialization != "independent":
             errors.append("minimal three-network core requires independent critic initialization")
         if algorithm.actor_update_delay != 1:

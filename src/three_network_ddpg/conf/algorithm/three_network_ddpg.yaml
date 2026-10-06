@@ -4,6 +4,7 @@ is_on_policy: false
 uses_replay_buffer: true
 supports_continuous_actions: true
 # Executable core and controlled agreement, beta, and schedule ablations.
+critic_objective: shared_error
 agreement_mode: none
 alpha: 0.0
 alpha_prime: 0.0
