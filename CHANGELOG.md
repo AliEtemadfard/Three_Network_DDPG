@@ -2,6 +2,48 @@
 
 ## Unreleased
 
+- Add the isolated `three_network_shared_d_conditioned_paired` recovery
+  hypothesis. It combines exact board-row correspondence with the previously
+  useful asymmetric current-value anchor and critic preparation, and prepares
+  a one-seed 20k early-signal comparison of Actor delays 2, 5, and 10 against DDPG.
+  Historical algorithms and run artifacts remain unchanged; no training is
+  performed by this preparation.
+
+- Add the isolated `three_network_shared_d_paired` advisor reconstruction with
+  one ordered replay batch and one detached next-action vector shared by both
+  critic phases, fresh Q2 values for Q1, and explicitly slower Actor updates.
+  Preserve shared-D objectives, stop-gradient paths, and historical variants;
+  prepare a manual-only one-seed 15k comparison of 10:1 and evenly spaced 10:2
+  critic-pair/Actor schedules against DDPG, with synthetic pairing and resume tests.
+
+- Add the opt-in `three_network_shared_d_synchronous` diagnostic, which computes
+  both shared-D critic gradient sets from one pre-update snapshot, commits both
+  critics, then applies a slower Actor. Prepare an isolated one-seed 15,000-step
+  manual screen against DDPG and the conservative sequential board schedule;
+  no Pendulum training is run by this preparation.
+
+- Add the opt-in `three_network_shared_d_board` reconstruction and a one-seed
+  20,000-step manual screen. It restores an update for both critics on every
+  shared minibatch in the source order, keeps D_prime diagnostic-only, and
+  isolates Actor warm-up and identical initial critic values without sharing
+  critic parameters. No Pendulum training is run by this preparation.
+
+- Add the opt-in `three_network_shared_d_two_timescale` reconstruction with
+  board-faithful current/next minibatch views, a slower and less frequent Critic
+  Two, an Actor clock tied to completed Critic Two updates, focused schedule and
+  gradient-path tests, and an isolated manual Pendulum comparison manifest.
+
+- Add the opt-in `three_network_shared_d` reconstruction: both critics optimize
+  the shared residual D plus positive agreement penalties, D_prime is diagnostic
+  only, and a configurable delayed actor preserves the existing gradient paths.
+  Prepare a paired one-seed, 100,000-step-per-variant manual DDPG comparison;
+  neither training nor convergence is claimed by this preparation.
+
+- Diagnose the completed long shared-D run's common Q-value translation failure
+  and add the isolated `three_network_shared_d_conditioned` experiment with
+  asymmetric agreements and an explicit critic-only policy-start phase. Earlier
+  objectives, checkpoints, and run artifacts remain unchanged.
+
 - Bootstrap the research repository with documentation, configuration, algorithm interfaces, CLI inspection commands, and fast scaffold tests. No training algorithm is implemented.
 
 - Establish Python 3.11 as the canonical Conda runtime, add an environment smoke check and Python 3.12 CI compatibility job, and record exact runtime and platform versions in run metadata.

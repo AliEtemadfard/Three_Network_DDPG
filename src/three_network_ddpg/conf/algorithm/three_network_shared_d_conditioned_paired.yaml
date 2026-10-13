@@ -1,0 +1,23 @@
+name: three_network_shared_d_conditioned_paired
+implementation_status: experimental
+is_on_policy: false
+uses_replay_buffer: true
+supports_continuous_actions: true
+critic_objective: shared_error
+agreement_mode: both
+alpha: 0.01
+alpha_prime: 10.0
+beta_regularizer:
+  mode: none
+  coefficient: 0.0
+update_schedule: sequential
+actor_state_source: next
+critic_initialization: independent
+paired_batch_contract: board_aligned_v1
+conditioning_contract: asymmetric_current_anchor_v1
+actor_update_delay: 10
+actor_learning_starts: 5000
+# The four board vectors share one ordered replay minibatch. Both critics update
+# every learner iteration. Q2 current agreement is deliberately stronger than
+# Q1 next agreement; the Actor starts after 5000 critic-pair updates and then
+# follows the configurable slower clock. No targets, beta, or D-prime training.

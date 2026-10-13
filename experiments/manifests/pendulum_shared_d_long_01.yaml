@@ -1,0 +1,108 @@
+schema_version: 2
+name: pendulum-shared-d-long-01
+description: Manual one-seed long development comparison of DDPG and shared-D with a delayed actor; convergence is not guaranteed.
+defaults:
+  environment: pendulum_v1
+  experiment: ddpg_baseline
+training_seeds: [11]
+evaluation_seeds: [1001, 1002, 1003, 1004, 1005]
+variants:
+  - id: ddpg
+    algorithm: ddpg
+    overrides:
+      - experiment.total_steps=100000
+      - experiment.warmup_steps=1000
+      - experiment.batch_size=64
+      - experiment.replay_capacity=100000
+      - experiment.evaluation_frequency=1000
+      - experiment.evaluation_episodes=5
+      - experiment.bootstrap_on_truncation=true
+      - experiment.clip_actions=true
+      - experiment.tracking.csv_jsonl=true
+      - experiment.tracking.tensorboard=false
+      - experiment.tracking.wandb=false
+      - environment.observation_normalization=false
+      - environment.reward_scale=1.0
+      - algorithm.hidden_layers=[128,128]
+      - algorithm.activation=relu
+      - algorithm.gamma=0.99
+      - algorithm.actor_learning_rate=0.0001
+      - algorithm.critic_one_learning_rate=0.0003
+      - algorithm.critic_two_learning_rate=0.0003
+      - algorithm.optimizer.name=adam
+      - algorithm.optimizer.epsilon=0.00000001
+      - algorithm.optimizer.weight_decay=0.0
+      - algorithm.exploration_noise.mode=gaussian
+      - algorithm.exploration_noise.standard_deviation=0.1
+      - algorithm.exploration_noise.clip=null
+      - algorithm.action_rescaling=true
+      - algorithm.gradient_clip_norm=10.0
+      - algorithm.actor_update_delay=1
+      - algorithm.target_networks.actor=true
+      - algorithm.target_networks.critic=true
+      - algorithm.target_networks.tau=0.005
+      - algorithm.device=cpu
+  - id: shared-d-delayed-actor
+    algorithm: three_network_shared_d
+    experiment: three_network_core
+    overrides:
+      - experiment.total_steps=100000
+      - experiment.warmup_steps=1000
+      - experiment.batch_size=64
+      - experiment.replay_capacity=100000
+      - experiment.evaluation_frequency=1000
+      - experiment.evaluation_episodes=5
+      - experiment.bootstrap_on_truncation=true
+      - experiment.clip_actions=true
+      - experiment.tracking.csv_jsonl=true
+      - experiment.tracking.tensorboard=false
+      - experiment.tracking.wandb=false
+      - environment.observation_normalization=false
+      - environment.reward_scale=1.0
+      - algorithm.hidden_layers=[128,128]
+      - algorithm.activation=relu
+      - algorithm.gamma=0.99
+      - algorithm.actor_learning_rate=0.0001
+      - algorithm.critic_one_learning_rate=0.0003
+      - algorithm.critic_two_learning_rate=0.0003
+      - algorithm.optimizer.name=adam
+      - algorithm.optimizer.epsilon=0.00000001
+      - algorithm.optimizer.weight_decay=0.0
+      - algorithm.exploration_noise.mode=gaussian
+      - algorithm.exploration_noise.standard_deviation=0.1
+      - algorithm.exploration_noise.clip=null
+      - algorithm.action_rescaling=true
+      - algorithm.gradient_clip_norm=10.0
+      - algorithm.critic_objective=shared_error
+      - algorithm.agreement_mode=both
+      - algorithm.alpha=0.1
+      - algorithm.alpha_prime=0.1
+      - algorithm.beta_regularizer.mode=none
+      - algorithm.beta_regularizer.coefficient=0.0
+      - algorithm.update_schedule=sequential
+      - algorithm.actor_state_source=next
+      - algorithm.critic_initialization=independent
+      - algorithm.actor_update_delay=2
+      - algorithm.guard.validation_batch=false
+      - algorithm.diagnostic_frequency=100
+      - algorithm.device=cpu
+execution:
+  output_root: runs/pendulum-shared-d-long-01
+  workers: 1
+analysis:
+  last_k: 10
+  bootstrap_samples: 2000
+  confidence_level: 0.95
+  bootstrap_seed: 20261006
+preregistration:
+  stage: pilot
+  stage_type: long_development_comparison
+  hypothesis: Training both critics on D with both positive agreement penalties and less frequent actor updates may reduce policy-induced drift; this is an unverified development hypothesis.
+  fixed_factors: [training seed, evaluation seeds, Pendulum-v1, wrappers, raw observations, reward scale, action scaling, CPU, one worker, architecture width, learning rates, Adam, replay, batch, warmup, exploration, gradient clipping, evaluation schedule, training budget]
+  varied_factors: [algorithm, critic objective, agreement, target networks, actor state source, actor update frequency]
+  primary_metrics: [evaluation_return_mean, normalized_auc]
+  mechanism_metrics: [shared_squared_error, q2_td_squared_error, current_agreement_error, next_agreement_error, q_abs_mean, q_abs_max, actor_gradient_norm, critic_one_gradient_norm, critic_two_gradient_norm, actor_shared_gradient_cosine, actor_update_applied, actor_update_steps]
+  reliability_metrics: [non_finite_runs, divergent_runs, failed_runs, interrupted_runs, incomplete_runs]
+  failure_and_divergence_rules: Finite completion is not stability. Inspect persistent return collapse, growing Q magnitudes, residuals and gradient spikes; never discard unsuccessful attempts.
+  stopping_rules: Fixed budget of 100000 training environment steps per run. Manually stop for failures or persistent collapse; do not extend merely to recover a favorable final checkpoint.
+  candidate_selection_rules: Compare the whole curve, normalized AUC and the last ten checkpoints. One training seed cannot establish superiority or convergence. No confirmatory seeds are used.

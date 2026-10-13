@@ -1,0 +1,18 @@
+name: three_network_shared_d
+implementation_status: experimental
+is_on_policy: false
+uses_replay_buffer: true
+supports_continuous_actions: true
+critic_objective: shared_error
+agreement_mode: both
+alpha: 0.1
+alpha_prime: 0.1
+beta_regularizer:
+  mode: none
+  coefficient: 0.0
+update_schedule: sequential
+actor_state_source: next
+critic_initialization: independent
+actor_update_delay: 2
+# Delayed policy updates are an experimental addition, not part of the board proof.
+# Target networks are forbidden, as in the original proposed method.

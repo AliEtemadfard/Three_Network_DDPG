@@ -1,0 +1,22 @@
+name: three_network_shared_d_paired
+implementation_status: experimental
+is_on_policy: false
+uses_replay_buffer: true
+supports_continuous_actions: true
+critic_objective: shared_error
+agreement_mode: both
+alpha: 0.1
+alpha_prime: 0.1
+beta_regularizer:
+  mode: none
+  coefficient: 0.0
+update_schedule: sequential
+actor_state_source: next
+critic_initialization: independent
+paired_batch_contract: board_aligned_v1
+actor_update_delay: 10
+actor_learning_starts: 0
+# Both critics update once per paired replay batch. Actor updates every 10th
+# critic-pair iteration (delay=5 means two evenly spaced updates per 10 pairs).
+# One detached actor(s_next) vector is reused in both critic phases, while Q2
+# outputs are recomputed after its step. No target networks; D-prime diagnostic only.

@@ -512,6 +512,20 @@ class ThreeNetworkDDPG(OffPolicyAlgorithm):
             actions = self.actor(states)
             return -self.critic_two(states, actions).mean()
 
+    def _actor_action_metrics(self, batch: TransitionBatch) -> dict[str, float]:
+        """Measure action-bound utilization without imposing a saturation threshold."""
+        center = (self.actor.action_low + self.actor.action_high) / 2
+        half_range = (self.actor.action_high - self.actor.action_low) / 2
+        with torch.no_grad():
+            current = ((self.actor(batch.observations) - center) / half_range).abs()
+            following = ((self.actor(batch.next_observations) - center) / half_range).abs()
+        return {
+            "actor_current_action_utilization_mean": float(current.mean().cpu()),
+            "actor_current_action_utilization_max": float(current.max().cpu()),
+            "actor_next_action_utilization_mean": float(following.mean().cpu()),
+            "actor_next_action_utilization_max": float(following.max().cpu()),
+        }
+
     def _clip_assigned_gradients(self, parameters: Sequence[nn.Parameter]) -> None:
         if self.settings.gradient_clip_norm is not None:
             torch.nn.utils.clip_grad_norm_(parameters, self.settings.gradient_clip_norm)
@@ -609,7 +623,9 @@ class ThreeNetworkDDPG(OffPolicyAlgorithm):
         self.actor_optimizer.step()
         return result
 
-    def _sequential_update(self, batch: TransitionBatch) -> tuple[_PhaseResult, _PhaseResult, _PhaseResult]:
+    def _sequential_update(
+        self, batch: TransitionBatch
+    ) -> tuple[_PhaseResult, _PhaseResult, _PhaseResult | None]:
         critic_two = self._sequential_critic_two(batch)
         critic_one = self._sequential_critic_one(batch)
         actor = self._sequential_actor(batch)
@@ -1032,6 +1048,7 @@ class ThreeNetworkDDPG(OffPolicyAlgorithm):
             and next_step % self.settings.diagnostic_frequency == 0
         ):
             diagnostic_values = self._gradient_diagnostics(batch)
+            diagnostic_values.update(self._actor_action_metrics(batch))
 
         guard_outcome: _GuardOutcome | None = None
         if self.settings.update_schedule == "sequential":

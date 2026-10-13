@@ -28,6 +28,68 @@ The ablation uses the shared off-policy trainer, replay buffer, evaluator, actio
 
 sequential applies Critic Two, recomputes the needed outputs, applies Critic One, then applies the actor. The later phases intentionally see earlier parameter changes.
 
+The separately registered `three_network_shared_d` variant reuses the shared-error
+critic phases with both agreement penalties and no beta. It runs the actor only
+every configured `actor_update_delay` critic iterations (default 2), after Q1.
+On intervening iterations only Q2 and Q1 step; all gradient paths in the matrix
+above are unchanged. D_prime is logged but never used as its training loss.
+Historical `three_network_ddpg` variants still update the actor every iteration.
+
+`three_network_shared_d_conditioned` is a distinct follow-up to the failed long
+shared-D run. It preserves the same critic equations and gradient matrix, uses
+stronger current than next agreement, and performs an explicit critic-only
+preparation phase before the delayed Actor begins. Its checkpointed update clock
+determines both preparation and delay, so resume cannot repeat the warm-up.
+
+`three_network_shared_d_two_timescale` retains the board-defined shared-D losses
+but uses separate clocks. Q1 updates on every learner minibatch; Q2 updates on a
+configurable slower cadence and with a lower configured learning rate; Actor
+updates are counted in completed Q2 updates after an explicit preparation
+period. When Q2 and Actor are due, sequential order remains Q2, recomputed Q1,
+Actor. Every due phase uses the same transition minibatch, with current
+`(s, a)` and next `(s_next, actor(s_next))` views kept distinct.
+
+`three_network_shared_d_board` is the follow-up after the slower and less
+frequent Q2 schedule failed its one-seed screen. It returns to the source
+pseudocode: Q2 and Q1 both update on every learner minibatch, Q2 is recomputed
+before Q1, and the Actor is last. It permits only two named screening controls:
+an Actor-only learning start and identical initial critic values. Identically
+initialized critics are distinct modules with distinct optimizers; no
+parameters are shared. Target networks, beta, D_prime training, and Critic Two
+clock decimation are excluded.
+
+`three_network_shared_d_synchronous` is a named stability diagnostic, not a
+replacement for the sequential board reconstruction. It calculates Q2 and Q1
+gradient sets from the same pre-update parameter snapshot while retaining the
+shared-D and agreement gradient paths in the matrix above. Both critic updates
+are committed before an independently delayed Actor update. This makes the
+critic timing different from the historical `simultaneous` schedule, which
+also calculated the Actor gradient from the old snapshot. Current-versus-next
+Actor state input is an explicit screening factor. Target networks remain
+absent and D_prime remains monitoring-only.
+
+`three_network_shared_d_paired` retains the sequential Q2 -> fresh Q2 values ->
+Q1 -> due Actor order and the stop-gradient matrix unchanged. It holds a single
+ordered TransitionBatch and one detached next-action vector for both critic
+phases: Y/Z1 use matched `(s_i, a_i)` and Y1/Z use matched
+`(s_next_i, actor(s_next_i))`, with r_i and mask_i from that transition. The
+Actor uses attached actions on those same next-state rows. No phase resamples
+or independently permutes a batch column. Both critics update on every learner
+iteration; Actor delay 10 (or 5) implements one (or two evenly spaced) Actor
+updates per ten critic-pair iterations. The default extra Actor warm-up is zero,
+separate from collection warm-up. A `board_aligned_v1` checkpoint semantic marker
+and strict schedule compatibility prevent silent reuse of older checkpoints.
+These are explicit input/schedule contracts, not evidence that older replay rows
+were misaligned or that the new version converges.
+
+`three_network_shared_d_conditioned_paired` preserves the same paired inputs,
+update order, and stop-gradient paths, but restores the earlier asymmetric
+agreement anchor (`alpha=0.01`, `alpha_prime=10.0`) and 5,000-update critic
+preparation period. Its named semantic contract fixes those values while
+allowing Actor delays 2, 5, and 10 to be compared without changing any other
+proposed-method setting. This is a recovery hypothesis motivated by observed
+Q drift; it is not a convergence guarantee.
+
 simultaneous computes and stores all three parameter gradient sets from one pre-update parameter snapshot. No optimizer steps occur before all required gradients are stored.
 
 guarded builds sequential proposals. It snapshots all three modules and all three optimizer states before the guarded phase, evaluates shared squared error on the update batch, and either accepts, retries from the same snapshot with a smaller effective learning rate, or restores the snapshot. Backtracking rates apply only to the candidate and reset to configured rates for the next learner update.
@@ -55,5 +117,10 @@ existing current and next inputs. No critic gradient flows through Z as a bootst
 Beta modes are none, experimental linear_y, and l2_y. l2_y_z is unavailable because the current stop-gradient contract does not define symmetric Z regularization; any symmetric objective requires advisor approval and a separate name. Exact formulas are recorded in [notation](notation.md).
 
 Every update records the shared residual, Critic Two's own TD residual, both squared errors, agreement errors, output statistics, component losses, and gradient norms. Guarded updates also record acceptance, rejection, retry count, last executed candidate scale and effective learning rate, batch error before and after, committed error, and optional validation change. At diagnostic_frequency, separate autograd calls measure each critic objective's alignment with its shared error gradient and the actor objective's interaction with the shared error gradient. Diagnostics never replace training gradients.
+
+At that same diagnostic interval, Actor outputs on current and next replay
+states are normalized by the environment action half-range and logged as mean
+and maximum absolute utilization. These monitoring-only values have no hidden
+saturation threshold and never affect an update.
 
 The next state actor objective remains the reconstructed default; current state input is an executable ablation. Critics remain independently initialized, the actor updates every learner step, and Adam is the implemented optimizer. See [controlled implementation](three_network_core.md). These mechanics establish no convergence or performance claim.

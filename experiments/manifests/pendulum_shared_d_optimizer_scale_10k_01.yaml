@@ -1,0 +1,112 @@
+schema_version: 2
+name: pendulum-shared-d-optimizer-scale-10k-01
+description: Manual-only one-seed optimizer-timescale screen that keeps the paired shared-D equations and best late Actor schedule fixed while reducing both critic learning rates, with and without a matched Actor reduction.
+defaults:
+  environment: pendulum_v1
+  experiment: three_network_core
+training_seeds: [11]
+evaluation_seeds: [1001, 1002, 1003, 1004, 1005]
+variants:
+  - id: critics-1e-4-actor-3e-5
+    algorithm: three_network_shared_d_paired
+    overrides:
+      - experiment.total_steps=10000
+      - experiment.warmup_steps=1000
+      - experiment.batch_size=64
+      - experiment.replay_capacity=100000
+      - experiment.evaluation_frequency=500
+      - experiment.evaluation_episodes=5
+      - experiment.bootstrap_on_truncation=true
+      - experiment.clip_actions=true
+      - environment.reward_scale=1.0
+      - algorithm.hidden_layers=[128,128]
+      - algorithm.activation=relu
+      - algorithm.gamma=0.99
+      - algorithm.actor_learning_rate=0.00003
+      - algorithm.critic_one_learning_rate=0.0001
+      - algorithm.critic_two_learning_rate=0.0001
+      - algorithm.optimizer.name=adam
+      - algorithm.optimizer.epsilon=0.00000001
+      - algorithm.optimizer.weight_decay=0.0
+      - algorithm.exploration_noise.mode=gaussian
+      - algorithm.exploration_noise.standard_deviation=0.1
+      - algorithm.exploration_noise.clip=null
+      - algorithm.action_rescaling=true
+      - algorithm.gradient_clip_norm=10.0
+      - algorithm.critic_objective=shared_error
+      - algorithm.agreement_mode=both
+      - algorithm.alpha=0.01
+      - algorithm.alpha_prime=10.0
+      - algorithm.beta_regularizer.mode=none
+      - algorithm.beta_regularizer.coefficient=0.0
+      - algorithm.update_schedule=sequential
+      - algorithm.actor_state_source=next
+      - algorithm.critic_initialization=independent
+      - algorithm.paired_batch_contract=board_aligned_v1
+      - algorithm.actor_update_delay=10
+      - algorithm.actor_learning_starts=0
+      - algorithm.guard.validation_batch=false
+      - algorithm.diagnostic_frequency=100
+      - algorithm.device=cpu
+
+  - id: critics-1e-4-actor-1e-5
+    algorithm: three_network_shared_d_paired
+    overrides:
+      - experiment.total_steps=10000
+      - experiment.warmup_steps=1000
+      - experiment.batch_size=64
+      - experiment.replay_capacity=100000
+      - experiment.evaluation_frequency=500
+      - experiment.evaluation_episodes=5
+      - experiment.bootstrap_on_truncation=true
+      - experiment.clip_actions=true
+      - environment.reward_scale=1.0
+      - algorithm.hidden_layers=[128,128]
+      - algorithm.activation=relu
+      - algorithm.gamma=0.99
+      - algorithm.actor_learning_rate=0.00001
+      - algorithm.critic_one_learning_rate=0.0001
+      - algorithm.critic_two_learning_rate=0.0001
+      - algorithm.optimizer.name=adam
+      - algorithm.optimizer.epsilon=0.00000001
+      - algorithm.optimizer.weight_decay=0.0
+      - algorithm.exploration_noise.mode=gaussian
+      - algorithm.exploration_noise.standard_deviation=0.1
+      - algorithm.exploration_noise.clip=null
+      - algorithm.action_rescaling=true
+      - algorithm.gradient_clip_norm=10.0
+      - algorithm.critic_objective=shared_error
+      - algorithm.agreement_mode=both
+      - algorithm.alpha=0.01
+      - algorithm.alpha_prime=10.0
+      - algorithm.beta_regularizer.mode=none
+      - algorithm.beta_regularizer.coefficient=0.0
+      - algorithm.update_schedule=sequential
+      - algorithm.actor_state_source=next
+      - algorithm.critic_initialization=independent
+      - algorithm.paired_batch_contract=board_aligned_v1
+      - algorithm.actor_update_delay=10
+      - algorithm.actor_learning_starts=0
+      - algorithm.guard.validation_batch=false
+      - algorithm.diagnostic_frequency=100
+      - algorithm.device=cpu
+execution:
+  output_root: runs/pendulum-shared-d-optimizer-scale-10k-01
+  workers: 1
+analysis:
+  last_k: 5
+  bootstrap_samples: 2000
+  confidence_level: 0.95
+  bootstrap_seed: 20261012
+preregistration:
+  stage: pilot
+  stage_type: paired_shared_d_optimizer_scale_screen
+  hypothesis: Lowering the Actor learning rate improved late checkpoints but did not improve normalized AUC, while critic gradients remained orders of magnitude larger than DDPG. Reducing both critic Adam step sizes may improve critic-policy tracking; the second variant preserves the 10-to-1 critic-to-Actor learning-rate ratio to distinguish a critic-only reduction from a uniform optimizer slowdown.
+  fixed_factors: [training seed, evaluation seeds, Pendulum-v1, raw rewards, raw observations, no wrappers, action scaling, CPU, one worker, architecture, replay, batch size, collection warm-up, exploration, evaluation schedule, per-run budget, shared-D equations, alpha, alpha-prime, immediate Actor start, Actor update delay, next-state Actor objective, independent critic initialization, no proposed target networks, no beta, paired minibatch contract, Q2-Q1-Actor order, equal critic learning rates, Adam settings, gradient clipping, truncation bootstrap policy]
+  varied_factors: [Actor learning rate 3e-5 versus 1e-5 with both critic learning rates fixed at 1e-4]
+  primary_metrics: [evaluation_return_mean, normalized_auc]
+  mechanism_metrics: [shared_squared_error, signed_residual_mean, q2_td_squared_error, current_agreement_error, next_agreement_error, q_abs_mean, q_abs_max, y_mean, z_mean, z1_mean, actor_gradient_norm, critic_one_gradient_norm, critic_two_gradient_norm, actor_current_action_utilization_mean, actor_next_action_utilization_mean, actor_update_applied, actor_update_steps, critic_pair_update_steps, paired_batch_size]
+  reliability_metrics: [non_finite_runs, divergent_runs, failed_runs, interrupted_runs, incomplete_runs]
+  failure_and_divergence_rules: Completion and finite values are insufficient. Reject a variant if it does not improve over several consecutive checkpoints, if a gain collapses before 10000 steps, or if Q scale, action utilization, and pre-clip gradients continue to oscillate without return improvement.
+  stopping_rules: Fixed 10000 environment steps per run. Do not extend or resume a completed unstable run. Preserve interrupted attempts as evidence.
+  candidate_selection_rules: Compare against the completed critics-3e-4 Actor-3e-5 delay-10 run and raw DDPG. The first variant isolates lower critic step sizes; the second then isolates an additional Actor slowdown. Do not select by the best single checkpoint or transfer to another environment unless late-window return, normalized AUC, and reliability diagnostics all improve.

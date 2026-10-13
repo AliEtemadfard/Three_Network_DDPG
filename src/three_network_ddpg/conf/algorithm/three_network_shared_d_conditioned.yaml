@@ -1,0 +1,21 @@
+name: three_network_shared_d_conditioned
+implementation_status: experimental
+is_on_policy: false
+uses_replay_buffer: true
+supports_continuous_actions: true
+critic_objective: shared_error
+agreement_mode: both
+# Weak next agreement avoids making Q1 chase an initially unanchored Q2 bootstrap.
+alpha: 0.01
+# Strong current agreement anchors Q2 to Q1's reward-driven current prediction.
+alpha_prime: 10.0
+beta_regularizer:
+  mode: none
+  coefficient: 0.0
+update_schedule: sequential
+actor_state_source: next
+critic_initialization: independent
+actor_update_delay: 2
+# Critic updates before policy optimization begins; counted after replay warm-up.
+actor_learning_starts: 5000
+# No target_networks key is permitted.

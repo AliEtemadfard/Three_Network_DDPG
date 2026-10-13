@@ -1,0 +1,20 @@
+name: three_network_shared_d_board
+implementation_status: experimental
+is_on_policy: false
+uses_replay_buffer: true
+supports_continuous_actions: true
+critic_objective: shared_error
+agreement_mode: both
+alpha: 0.1
+alpha_prime: 0.1
+beta_regularizer:
+  mode: none
+  coefficient: 0.0
+update_schedule: sequential
+actor_state_source: next
+critic_initialization: independent
+actor_update_delay: 1
+actor_learning_starts: 0
+# Both critics update on every learner minibatch. Q2 is stepped first, Q2 is
+# recomputed for Q1, and the Actor is stepped last when its clock is due.
+# There are no target networks and D_prime remains diagnostic-only.

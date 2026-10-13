@@ -84,7 +84,16 @@ def validate_config(config: DictConfig) -> None:
     ):
         if getattr(algorithm, field, None) != getattr(metadata, field):
             errors.append(f"algorithm.{field} must match registry metadata")
-    if algorithm.name == "three_network_ddpg":
+    if algorithm.name in {
+        "three_network_ddpg",
+        "three_network_shared_d",
+        "three_network_shared_d_board",
+        "three_network_shared_d_paired",
+        "three_network_shared_d_conditioned_paired",
+        "three_network_shared_d_conditioned",
+        "three_network_shared_d_synchronous",
+        "three_network_shared_d_two_timescale",
+    }:
         if "target_networks" in algorithm:
             errors.append("proposed main variant must not define target networks")
         if algorithm.critic_objective not in _CRITIC_OBJECTIVES:
@@ -107,9 +116,12 @@ def validate_config(config: DictConfig) -> None:
             errors.append("separate_td requires the sequential update schedule")
         if algorithm.critic_objective == "separate_td" and (beta_mode != "none" or beta_coefficient != 0):
             errors.append("separate_td requires beta regularization to be disabled")
-        if algorithm.critic_initialization != "independent":
+        if (
+            algorithm.name != "three_network_shared_d_board"
+            and algorithm.critic_initialization != "independent"
+        ):
             errors.append("minimal three-network core requires independent critic initialization")
-        if algorithm.actor_update_delay != 1:
+        if algorithm.name == "three_network_ddpg" and algorithm.actor_update_delay != 1:
             errors.append("minimal three-network core updates the actor every learner step")
         if algorithm.optimizer.name != "adam":
             errors.append("minimal three-network core currently supports the Adam optimizer")
@@ -117,6 +129,90 @@ def validate_config(config: DictConfig) -> None:
             errors.append("minimal three-network core requires action rescaling")
         if algorithm.exploration_noise.mode not in {"gaussian", "none"}:
             errors.append("minimal three-network core supports gaussian or disabled exploration")
+        if algorithm.name in {
+            "three_network_shared_d",
+            "three_network_shared_d_board",
+            "three_network_shared_d_paired",
+            "three_network_shared_d_conditioned_paired",
+            "three_network_shared_d_conditioned",
+            "three_network_shared_d_synchronous",
+            "three_network_shared_d_two_timescale",
+        }:
+            if algorithm.critic_objective != "shared_error" or algorithm.agreement_mode != "both":
+                errors.append("shared-D requires shared_error and both agreement penalties")
+            if beta_mode != "none" or beta_coefficient != 0:
+                errors.append("shared-D requires beta to be disabled")
+            if algorithm.name != "three_network_shared_d_synchronous" and (
+                algorithm.update_schedule != "sequential" or algorithm.actor_state_source != "next"
+            ):
+                errors.append("shared-D requires sequential updates and the next-state actor objective")
+        if algorithm.name in {
+            "three_network_shared_d_board",
+            "three_network_shared_d_paired",
+            "three_network_shared_d_conditioned_paired",
+        }:
+            actor_learning_starts = algorithm.get("actor_learning_starts")
+            if (
+                isinstance(actor_learning_starts, bool)
+                or not isinstance(actor_learning_starts, int)
+                or actor_learning_starts < 0
+            ):
+                errors.append("board shared-D actor_learning_starts must be nonnegative")
+        if algorithm.name in {
+            "three_network_shared_d_paired",
+            "three_network_shared_d_conditioned_paired",
+        }:
+            if algorithm.get("paired_batch_contract") != "board_aligned_v1":
+                errors.append("paired shared-D requires paired_batch_contract=board_aligned_v1")
+            delay = algorithm.actor_update_delay
+            if isinstance(delay, bool) or not isinstance(delay, int) or delay < 2:
+                errors.append("paired shared-D requires more critic-pair updates than Actor updates")
+        if algorithm.name == "three_network_shared_d_conditioned_paired":
+            if algorithm.get("conditioning_contract") != "asymmetric_current_anchor_v1":
+                errors.append(
+                    "conditioned paired shared-D requires conditioning_contract=asymmetric_current_anchor_v1"
+                )
+            if algorithm.alpha != 0.01 or algorithm.alpha_prime != 10.0:
+                errors.append("conditioned paired shared-D requires alpha=0.01 and alpha_prime=10.0")
+            if algorithm.actor_learning_starts != 5_000:
+                errors.append("conditioned paired shared-D requires actor_learning_starts=5000")
+        if algorithm.name == "three_network_shared_d_conditioned":
+            actor_learning_starts = algorithm.get("actor_learning_starts")
+            if (
+                isinstance(actor_learning_starts, bool)
+                or not isinstance(actor_learning_starts, int)
+                or actor_learning_starts < 0
+            ):
+                errors.append("conditioned shared-D actor_learning_starts must be nonnegative")
+            if algorithm.alpha <= 0 or algorithm.alpha_prime <= algorithm.gamma * algorithm.alpha:
+                errors.append("conditioned shared-D requires alpha_prime > gamma * alpha > 0")
+        if algorithm.name == "three_network_shared_d_synchronous":
+            actor_learning_starts = algorithm.get("actor_learning_starts")
+            if algorithm.update_schedule != "simultaneous":
+                errors.append("synchronous shared-D requires simultaneous critic gradients")
+            if (
+                isinstance(actor_learning_starts, bool)
+                or not isinstance(actor_learning_starts, int)
+                or actor_learning_starts < 0
+            ):
+                errors.append("synchronous shared-D actor_learning_starts must be nonnegative")
+        if algorithm.name == "three_network_shared_d_two_timescale":
+            actor_learning_starts = algorithm.get("actor_learning_starts")
+            critic_two_update_delay = algorithm.get("critic_two_update_delay")
+            if (
+                isinstance(actor_learning_starts, bool)
+                or not isinstance(actor_learning_starts, int)
+                or actor_learning_starts < 0
+            ):
+                errors.append("two-timescale shared-D actor_learning_starts must be nonnegative")
+            if (
+                isinstance(critic_two_update_delay, bool)
+                or not isinstance(critic_two_update_delay, int)
+                or critic_two_update_delay < 2
+            ):
+                errors.append("two-timescale shared-D critic_two_update_delay must be >= 2")
+            if algorithm.critic_two_learning_rate >= algorithm.critic_one_learning_rate:
+                errors.append("two-timescale shared-D requires Critic Two to learn slower than Critic One")
     if algorithm.name in {"ddpg", "ddpg_no_target_actor", "td3"}:
         if "target_networks" not in algorithm:
             errors.append("DDPG-family and TD3 configs require explicit target-network settings")

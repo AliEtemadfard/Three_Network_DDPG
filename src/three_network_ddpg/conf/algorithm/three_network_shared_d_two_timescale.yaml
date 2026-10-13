@@ -1,0 +1,25 @@
+name: three_network_shared_d_two_timescale
+implementation_status: experimental
+is_on_policy: false
+uses_replay_buffer: true
+supports_continuous_actions: true
+actor_learning_rate: 0.0001
+critic_one_learning_rate: 0.0003
+critic_two_learning_rate: 0.00003
+critic_objective: shared_error
+agreement_mode: both
+alpha: 0.1
+alpha_prime: 0.1
+beta_regularizer:
+  mode: none
+  coefficient: 0.0
+update_schedule: sequential
+actor_state_source: next
+critic_initialization: independent
+# Actor cadence is measured in completed Critic Two updates.
+actor_update_delay: 2
+# Learner/Q1 updates completed before policy optimization is eligible.
+actor_learning_starts: 5000
+# Q1 updates on every learner minibatch; Q2 updates on every second minibatch.
+critic_two_update_delay: 2
+# No target_networks key is permitted.

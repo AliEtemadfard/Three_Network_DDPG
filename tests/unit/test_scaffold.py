@@ -56,7 +56,17 @@ def test_registry_metadata_and_composition(name: str) -> None:
     assert config.algorithm.is_on_policy == capabilities.is_on_policy
     if name == "ddpg":
         assert capabilities.implementation_status == "verified"
-    elif name in {"ddpg_no_target_actor", "three_network_ddpg"}:
+    elif name in {
+        "ddpg_no_target_actor",
+        "three_network_ddpg",
+        "three_network_shared_d",
+        "three_network_shared_d_board",
+        "three_network_shared_d_paired",
+        "three_network_shared_d_conditioned_paired",
+        "three_network_shared_d_conditioned",
+        "three_network_shared_d_synchronous",
+        "three_network_shared_d_two_timescale",
+    }:
         assert capabilities.implementation_status == "experimental"
     else:
         assert capabilities.implementation_status == "planned"
