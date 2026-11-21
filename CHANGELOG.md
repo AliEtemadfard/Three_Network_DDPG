@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Refresh the README to distinguish the original core from shared-D variants,
+  document separate-TD constraints and existing Pendulum findings, and clarify
+  that manifest resume starts a new attempt rather than restoring training state.
+  Replace the unavailable local launcher in the shared-D diagnosis with portable
+  module commands. No algorithm, configuration, or experiment result is changed.
+
 - Add the isolated `three_network_shared_d_conditioned_paired` recovery
   hypothesis. It combines exact board-row correspondence with the previously
   useful asymmetric current-value anchor and critic preparation, and prepares
