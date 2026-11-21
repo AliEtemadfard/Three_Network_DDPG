@@ -110,22 +110,22 @@ Primary background: [Sharifnassab and Sutton, 2023](https://proceedings.mlr.pres
 
 ## Manual commands
 
-These commands use the repository launcher, so an active `.venv` cannot shadow
-the canonical Conda interpreter. Validation and planning do not train. The `run`
-line is intentionally manual and was not executed while preparing this change.
+Run these commands from the repository root after activating the canonical
+Conda environment. Validation and planning do not train. The `run` line is
+intentionally manual and was not executed while preparing this change.
 
 ```powershell
-Set-Location 'F:\lessons\arshad\three-network-ddpg'
-.\Experiment.cmd validate experiments\manifests\pendulum_shared_d_conditioned_01.yaml
-.\Experiment.cmd plan experiments\manifests\pendulum_shared_d_conditioned_01.yaml
-.\Experiment.cmd run experiments\manifests\pendulum_shared_d_conditioned_01.yaml --workers 1
-.\Experiment.cmd status experiments\manifests\pendulum_shared_d_conditioned_01.yaml
-.\Experiment.cmd aggregate experiments\manifests\pendulum_shared_d_conditioned_01.yaml
-.\Experiment.cmd plot experiments\manifests\pendulum_shared_d_conditioned_01.yaml --metric evaluation_return_mean
-.\Experiment.cmd plot experiments\manifests\pendulum_shared_d_conditioned_01.yaml --metric shared_squared_error
-.\Experiment.cmd plot experiments\manifests\pendulum_shared_d_conditioned_01.yaml --metric q_abs_mean
-.\Experiment.cmd plot experiments\manifests\pendulum_shared_d_conditioned_01.yaml --metric current_agreement_error
-.\Experiment.cmd plot experiments\manifests\pendulum_shared_d_conditioned_01.yaml --metric next_agreement_error
+conda activate three-network-ddpg
+python -m three_network_ddpg experiment validate experiments\manifests\pendulum_shared_d_conditioned_01.yaml
+python -m three_network_ddpg experiment plan experiments\manifests\pendulum_shared_d_conditioned_01.yaml
+python -m three_network_ddpg experiment run experiments\manifests\pendulum_shared_d_conditioned_01.yaml --workers 1
+python -m three_network_ddpg experiment status experiments\manifests\pendulum_shared_d_conditioned_01.yaml
+python -m three_network_ddpg experiment aggregate experiments\manifests\pendulum_shared_d_conditioned_01.yaml
+python -m three_network_ddpg experiment plot experiments\manifests\pendulum_shared_d_conditioned_01.yaml --metric evaluation_return_mean
+python -m three_network_ddpg experiment plot experiments\manifests\pendulum_shared_d_conditioned_01.yaml --metric shared_squared_error
+python -m three_network_ddpg experiment plot experiments\manifests\pendulum_shared_d_conditioned_01.yaml --metric q_abs_mean
+python -m three_network_ddpg experiment plot experiments\manifests\pendulum_shared_d_conditioned_01.yaml --metric current_agreement_error
+python -m three_network_ddpg experiment plot experiments\manifests\pendulum_shared_d_conditioned_01.yaml --metric next_agreement_error
 ```
 
 Use `resume` only after inspecting an interrupted or failed attempt; it starts a
