@@ -208,10 +208,12 @@ Despite completing, the three-network run already showed mechanism instability: 
 
 Plot references:
 
-- [Stage A comparison](../../runs/pendulum-pilot-01/pendulum-pilot-01-stage-a/reports/plots/comparison-evaluation_return_mean.svg)
-- [Stage A DDPG](../../runs/pendulum-pilot-01/pendulum-pilot-01-stage-a/reports/plots/ddpg-pipeline-smoke-evaluation_return_mean.svg)
-- [Stage A no-target-actor DDPG](../../runs/pendulum-pilot-01/pendulum-pilot-01-stage-a/reports/plots/ddpg-no-target-actor-pipeline-smoke-evaluation_return_mean.svg)
-- [Stage A three-network shared-error](../../runs/pendulum-pilot-01/pendulum-pilot-01-stage-a/reports/plots/three-network-shared-error-pipeline-smoke-evaluation_return_mean.svg)
+These are paths to local generated artifacts, not files distributed in this repository. The paths are retained for provenance; access requires the original run artifacts.
+
+- Stage A comparison: `runs/pendulum-pilot-01/pendulum-pilot-01-stage-a/reports/plots/comparison-evaluation_return_mean.svg`
+- Stage A DDPG: `runs/pendulum-pilot-01/pendulum-pilot-01-stage-a/reports/plots/ddpg-pipeline-smoke-evaluation_return_mean.svg`
+- Stage A no-target-actor DDPG: `runs/pendulum-pilot-01/pendulum-pilot-01-stage-a/reports/plots/ddpg-no-target-actor-pipeline-smoke-evaluation_return_mean.svg`
+- Stage A three-network shared-error: `runs/pendulum-pilot-01/pendulum-pilot-01-stage-a/reports/plots/three-network-shared-error-pipeline-smoke-evaluation_return_mean.svg`
 
 ### Stage B per-seed control results
 
@@ -257,10 +259,10 @@ For agreement mode `none`, critic-objective/shared-error gradient cosines remain
 
 Plot references:
 
-- [Stage B comparison](../../runs/pendulum-pilot-01/pendulum-pilot-01-stage-b/reports/plots/comparison-evaluation_return_mean.svg)
-- [Stage B DDPG](../../runs/pendulum-pilot-01/pendulum-pilot-01-stage-b/reports/plots/ddpg-evaluation_return_mean.svg)
-- [Stage B no-target-actor DDPG](../../runs/pendulum-pilot-01/pendulum-pilot-01-stage-b/reports/plots/ddpg-no-target-actor-evaluation_return_mean.svg)
-- [Stage B three-network shared-error](../../runs/pendulum-pilot-01/pendulum-pilot-01-stage-b/reports/plots/three-network-shared-error-evaluation_return_mean.svg)
+- Stage B comparison: `runs/pendulum-pilot-01/pendulum-pilot-01-stage-b/reports/plots/comparison-evaluation_return_mean.svg`
+- Stage B DDPG: `runs/pendulum-pilot-01/pendulum-pilot-01-stage-b/reports/plots/ddpg-evaluation_return_mean.svg`
+- Stage B no-target-actor DDPG: `runs/pendulum-pilot-01/pendulum-pilot-01-stage-b/reports/plots/ddpg-no-target-actor-evaluation_return_mean.svg`
+- Stage B three-network shared-error: `runs/pendulum-pilot-01/pendulum-pilot-01-stage-b/reports/plots/three-network-shared-error-evaluation_return_mean.svg`
 
 ### Stage C per-seed agreement results
 
@@ -312,11 +314,11 @@ The zero final actor gradient norms for all `next` and `both` seeds, after very 
 
 Plot references:
 
-- [Stage C comparison](../../runs/pendulum-pilot-01/pendulum-pilot-01-stage-c/reports/plots/comparison-evaluation_return_mean.svg)
-- [Stage C none](../../runs/pendulum-pilot-01/pendulum-pilot-01-stage-c/reports/plots/three-network-none-evaluation_return_mean.svg)
-- [Stage C current](../../runs/pendulum-pilot-01/pendulum-pilot-01-stage-c/reports/plots/three-network-current-evaluation_return_mean.svg)
-- [Stage C next](../../runs/pendulum-pilot-01/pendulum-pilot-01-stage-c/reports/plots/three-network-next-evaluation_return_mean.svg)
-- [Stage C both](../../runs/pendulum-pilot-01/pendulum-pilot-01-stage-c/reports/plots/three-network-both-evaluation_return_mean.svg)
+- Stage C comparison: `runs/pendulum-pilot-01/pendulum-pilot-01-stage-c/reports/plots/comparison-evaluation_return_mean.svg`
+- Stage C none: `runs/pendulum-pilot-01/pendulum-pilot-01-stage-c/reports/plots/three-network-none-evaluation_return_mean.svg`
+- Stage C current: `runs/pendulum-pilot-01/pendulum-pilot-01-stage-c/reports/plots/three-network-current-evaluation_return_mean.svg`
+- Stage C next: `runs/pendulum-pilot-01/pendulum-pilot-01-stage-c/reports/plots/three-network-next-evaluation_return_mean.svg`
+- Stage C both: `runs/pendulum-pilot-01/pendulum-pilot-01-stage-c/reports/plots/three-network-both-evaluation_return_mean.svg`
 
 ## Reliability and failure record
 

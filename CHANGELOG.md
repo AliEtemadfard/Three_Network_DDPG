@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add a current-method guide for the latest conditioned-paired shared-D variant,
+  distinguish its manifest from the original core CLI, and record that historical
+  feature branches are already contained in main. Make remaining manual research
+  commands independent of personal filesystem paths, label unavailable plot paths
+  as local artifacts, and refresh package wording.
+  Algorithm equations, defaults, and recorded experimental results are unchanged.
+
 - Refresh the README to distinguish the original core from shared-D variants,
   document separate-TD constraints and existing Pendulum findings, and clarify
   that manifest resume starts a new attempt rather than restoring training state.

@@ -39,36 +39,37 @@ screen محلی و seed 11» خواهد بود؛ نه بهترین پارامت�
 
 ## اجرای دستی PowerShell
 
-```powershell
-Set-Location 'F:\lessons\arshad\three-network-ddpg'
+دستورها را از ریشهٔ مخزن و پس از ساخت محیط Conda اجرا کنید.
 
-$Python = 'C:\Users\aliet\anaconda3\envs\three-network-ddpg\python.exe'
+```powershell
+conda activate three-network-ddpg
+
 $Manifest = 'experiments\manifests\pendulum_shared_d_local_tuning_10k_01.yaml'
 
-& $Python -m three_network_ddpg experiment validate $Manifest
-& $Python -m three_network_ddpg experiment plan $Manifest
-& $Python -m three_network_ddpg experiment run $Manifest
+python -m three_network_ddpg experiment validate $Manifest
+python -m three_network_ddpg experiment plan $Manifest
+python -m three_network_ddpg experiment run $Manifest
 ```
 
 پس از پایان:
 
 ```powershell
-& $Python -m three_network_ddpg experiment status $Manifest
-& $Python -m three_network_ddpg experiment aggregate $Manifest
+python -m three_network_ddpg experiment status $Manifest
+python -m three_network_ddpg experiment aggregate $Manifest
 
-& $Python -m three_network_ddpg experiment plot $Manifest --metric evaluation_return_mean
-& $Python -m three_network_ddpg experiment plot $Manifest --metric shared_squared_error
-& $Python -m three_network_ddpg experiment plot $Manifest --metric q_abs_max
-& $Python -m three_network_ddpg experiment plot $Manifest --metric actor_gradient_norm
-& $Python -m three_network_ddpg experiment plot $Manifest --metric critic_one_gradient_norm
-& $Python -m three_network_ddpg experiment plot $Manifest --metric critic_two_gradient_norm
-& $Python -m three_network_ddpg experiment plot $Manifest --metric actor_next_action_utilization_mean
+python -m three_network_ddpg experiment plot $Manifest --metric evaluation_return_mean
+python -m three_network_ddpg experiment plot $Manifest --metric shared_squared_error
+python -m three_network_ddpg experiment plot $Manifest --metric q_abs_max
+python -m three_network_ddpg experiment plot $Manifest --metric actor_gradient_norm
+python -m three_network_ddpg experiment plot $Manifest --metric critic_one_gradient_norm
+python -m three_network_ddpg experiment plot $Manifest --metric critic_two_gradient_norm
+python -m three_network_ddpg experiment plot $Manifest --metric actor_next_action_utilization_mean
 ```
 
 در صورت interruption واقعی:
 
 ```powershell
-& $Python -m three_network_ddpg experiment resume $Manifest
+python -m three_network_ddpg experiment resume $Manifest
 ```
 
 ## نتیجه‌ی اجرا ــ ۲۰۲۶-۱۰-۱۳

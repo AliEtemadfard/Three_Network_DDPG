@@ -1,1 +1,1 @@
-"""Algorithm namespaces are placeholders until independently verified."""
+"""Implemented DDPG and experimental three-network methods, plus planned baseline namespaces."""

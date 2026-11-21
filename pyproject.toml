@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "three-network-ddpg"
 version = "0.1.0"
-description = "Research scaffold for a three-network deterministic actor-critic method"
+description = "PyTorch research on target-free three-network actor-critic methods and DDPG baselines"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 authors = [{ name = "Three Network DDPG contributors" }]
