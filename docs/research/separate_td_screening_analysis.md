@@ -347,18 +347,20 @@ intended objective, the red annotation, or a convergence argument.
 Existing aggregation was read, and additional diagnostic SVGs were generated from
 that saved aggregate only. All figures and raw artifacts remain ignored by Git.
 
-- [Shared-scale return comparison](../../runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/comparison-evaluation_return_mean.svg)
-- [Separate TD shared error](../../runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-separate-td-shared_squared_error.svg)
-- [Original shared error](../../runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-shared-error-shared_squared_error.svg)
-- [Separate TD own error](../../runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-separate-td-q2_td_squared_error.svg)
-- [Original own error](../../runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-shared-error-q2_td_squared_error.svg)
-- [Separate TD current agreement](../../runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-separate-td-current_agreement_error.svg)
-- [Separate TD next agreement](../../runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-separate-td-next_agreement_error.svg)
-- [Separate TD Q scale](../../runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-separate-td-q_abs_max.svg)
-- [Original Q scale](../../runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-shared-error-q_abs_max.svg)
-- [Separate TD actor gradients](../../runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-separate-td-actor_gradient_norm.svg)
-- [Separate TD Q1 gradients](../../runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-separate-td-critic_one_gradient_norm.svg)
-- [Separate TD Q2 gradients](../../runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-separate-td-critic_two_gradient_norm.svg)
+These are paths to local generated artifacts, not files distributed in this repository. The paths are retained for provenance; access requires the original run artifacts.
+
+- Shared-scale return comparison: `runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/comparison-evaluation_return_mean.svg`
+- Separate TD shared error: `runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-separate-td-shared_squared_error.svg`
+- Original shared error: `runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-shared-error-shared_squared_error.svg`
+- Separate TD own error: `runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-separate-td-q2_td_squared_error.svg`
+- Original own error: `runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-shared-error-q2_td_squared_error.svg`
+- Separate TD current agreement: `runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-separate-td-current_agreement_error.svg`
+- Separate TD next agreement: `runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-separate-td-next_agreement_error.svg`
+- Separate TD Q scale: `runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-separate-td-q_abs_max.svg`
+- Original Q scale: `runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-shared-error-q_abs_max.svg`
+- Separate TD actor gradients: `runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-separate-td-actor_gradient_norm.svg`
+- Separate TD Q1 gradients: `runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-separate-td-critic_one_gradient_norm.svg`
+- Separate TD Q2 gradients: `runs/pendulum-separate-td-screening-01/pendulum-separate-td-screening-01/reports/plots/three-network-separate-td-critic_two_gradient_norm.svg`
 
 Only the return comparison has a shared plotting scale across variants; mechanism
 panels auto-scale separately. Compare numeric tables or axis labels, not visual panel
@@ -398,13 +400,12 @@ fit alone may also reflect the smaller rate. If scale/error spikes persist, spen
 longer budget is not justified merely by finite completion. Any promising result still
 needs paired development-seed replication before a scientific ranking.
 
-The commands below create a small manifest under the ignored `runs/manual-plans`
+From the repository root, the commands below create a small manifest under the ignored `runs/manual-plans`
 directory, preserving the source manifest and prior results. They are manual commands;
 no run or resume command was executed during this audit. Do not regenerate or edit
 the manifest after its study starts. Keep the code commit fixed for run/resume.
 
 ```powershell
-Set-Location F:\lessons\arshad\three-network-ddpg
 conda activate three-network-ddpg
 git status --short --branch
 git rev-parse HEAD

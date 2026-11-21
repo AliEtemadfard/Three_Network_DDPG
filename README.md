@@ -45,6 +45,12 @@ The core also supports the opt-in `critic_objective=separate_td`: both critics r
 
 The separately registered `three_network_shared_d*` variants retain the shared-error objective with both agreement penalties and no beta regularizer. They explore delayed actor updates, conditioning, board-aligned or paired batches, synchronous critic gradients, and two-timescale updates. Constraints differ by variant: `three_network_shared_d_board` also permits identical initial critic values with independent parameters. See the [algorithm registry](src/three_network_ddpg/algorithms/registry.py), [packaged configurations](src/three_network_ddpg/conf/algorithm/), and [conditioning diagnosis](docs/research/shared_d_instability_correction.md).
 
+## Latest implemented research variant
+
+The most recent implementation in this repository is `three_network_shared_d_conditioned_paired`: one actor and two independent critics, paired replay rows, asymmetric agreement penalties, and delayed actor updates after a critic-only preparation phase. It remains experimental; it is not an established replacement for DDPG. See [the current method guide](docs/research/current_method.md) for its equations, exact settings, and commands.
+
+The short `train-three-network` command runs the original `three_network_ddpg` core. Use the conditioned-paired manifest described in the guide to run the newer variant. The historical feature branches are already contained in `main`.
+
 ## Documented development findings
 
 The [Pendulum Pilot 01 analysis](docs/research/pendulum_pilot_01_failure_analysis.md) reports useful control from both DDPG controls, while the tested shared-error three-network settings showed growing critic values and poor returns. The [separate-TD screening](docs/research/separate_td_screening_analysis.md) reports reduced value drift in a one-training-seed screen, but performance remained below DDPG. The [shared-D long-run diagnosis](docs/research/shared_d_instability_correction.md) records further value drift and actor saturation in the inspected setting.
